@@ -29,7 +29,10 @@ export class ServiceNowClient {
   private authHeader: string;
 
   constructor(credentials: ServiceNowCredentials) {
-    this.baseUrl = credentials.url.replace(/\/$/, "");
+    // Extract just the origin (protocol + hostname) to handle cases where
+    // users paste a full login URL instead of the base instance URL
+    const parsed = new URL(credentials.url);
+    this.baseUrl = parsed.origin;
     this.authHeader =
       "Basic " +
       Buffer.from(`${credentials.username}:${credentials.password}`).toString(

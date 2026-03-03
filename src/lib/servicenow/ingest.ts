@@ -42,6 +42,12 @@ export async function ingestFromInstance(
       ServiceNowClient.parseTableRecord(r)
     );
 
+    if (parsedTables.length === 0) {
+      throw new Error(
+        "No tables returned from ServiceNow. Check that the instance URL and credentials are correct, and that the user has read access to sys_db_object."
+      );
+    }
+
     for (let i = 0; i < parsedTables.length; i += DB_BATCH_SIZE) {
       const batch = parsedTables.slice(i, i + DB_BATCH_SIZE);
       await prisma.snapshotTable.createMany({

@@ -30,10 +30,21 @@ export async function POST(request: Request) {
     );
   }
 
+  // Extract just the origin (protocol + hostname) in case user pastes a full URL
+  let cleanUrl: string;
+  try {
+    cleanUrl = new URL(url).origin;
+  } catch {
+    return NextResponse.json(
+      { error: "Invalid URL format" },
+      { status: 400 }
+    );
+  }
+
   const instance = await prisma.serviceNowInstance.create({
     data: {
       name,
-      url: url.replace(/\/$/, ""),
+      url: cleanUrl,
       username,
       encryptedPassword: password, // TODO: encrypt
     },
