@@ -271,11 +271,18 @@ export default function SnapshotsPage() {
               {snapshots.map((snap) => (
                 <TableRow key={snap.id}>
                   <TableCell className="font-medium">
-                    {snap.label}
-                    {snap.version && (
-                      <span className="text-muted-foreground ml-1">
-                        ({snap.version})
-                      </span>
+                    <div>
+                      {snap.label}
+                      {snap.version && (
+                        <span className="text-muted-foreground ml-1">
+                          ({snap.version})
+                        </span>
+                      )}
+                    </div>
+                    {snap.status === "FAILED" && snap.errorMessage && (
+                      <p className="text-xs text-destructive mt-1 font-normal max-w-[400px]">
+                        {snap.errorMessage}
+                      </p>
                     )}
                   </TableCell>
                   <TableCell>{statusBadge(snap.status)}</TableCell>

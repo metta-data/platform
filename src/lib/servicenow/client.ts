@@ -147,6 +147,70 @@ export class ServiceNowClient {
     return allRecords;
   }
 
+  /**
+   * Tests connectivity by fetching a count of sys_db_object records.
+   * Returns the table count on success, or throws with a descriptive error.
+   */
+  async testConnection(): Promise<{ success: true; tableCount: number }> {
+    const endpoint = "/api/now/table/sys_db_object";
+    const url = new URL(`${this.baseUrl}${endpoint}`);
+    url.searchParams.set("sysparm_limit", "1");
+
+    let response: Response;
+    try {
+      response = await fetch(url.toString(), {
+        headers: {
+          Authorization: this.authHeader,
+          Accept: "application/json",
+        },
+        signal: AbortSignal.timeout(15000), // 15s timeout
+      });
+    } catch (err) {
+      if (err instanceof Error && err.name === "TimeoutError") {
+        throw new Error(
+          `Connection timed out. Verify the instance URL (${this.baseUrl}) is correct and accessible.`
+        );
+      }
+      throw new Error(
+        `Cannot reach ${this.baseUrl}. Check that the URL is correct and the instance is online.`
+      );
+    }
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error(
+        "Authentication failed. Check that the username and password are correct and the user has API access."
+      );
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        `ServiceNow returned an error: ${response.status} ${response.statusText}`
+      );
+    }
+
+    // Check that we got a valid JSON response with results
+    let body: { result?: unknown[] };
+    try {
+      body = await response.json();
+    } catch {
+      throw new Error(
+        "Unexpected response from ServiceNow. The URL may not point to a valid ServiceNow instance."
+      );
+    }
+
+    if (!body.result || !Array.isArray(body.result)) {
+      throw new Error(
+        "Unexpected response format. The URL may not point to a valid ServiceNow instance."
+      );
+    }
+
+    const tableCount = parseInt(
+      response.headers.get("X-Total-Count") || "0",
+      10
+    );
+    return { success: true, tableCount };
+  }
+
   static parseTableRecord(record: SysDbObjectRecord) {
     return {
       sysId: record.sys_id,

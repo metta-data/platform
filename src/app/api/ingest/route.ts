@@ -30,7 +30,10 @@ export async function POST(request: Request) {
     username: instance.username,
     password: instance.encryptedPassword, // TODO: decrypt
   }).catch((err) => {
-    console.error("Ingestion failed:", err);
+    console.error(
+      `Ingestion failed for snapshot ${snapshotId} (instance: ${instance.name} / ${instance.url}):`,
+      err instanceof Error ? err.message : err
+    );
   });
 
   return NextResponse.json({ status: "started", snapshotId });

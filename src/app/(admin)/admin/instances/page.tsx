@@ -36,30 +36,19 @@ interface Instance {
 
 const emptyForm = { name: "", url: "", username: "", password: "" };
 
-/**
- * Validates and cleans a ServiceNow instance URL.
- * Accepts formats like:
- *   https://instance.service-now.com
- *   instance.service-now.com
- *   https://instance.service-now.com/login.do?...
- * Returns the cleaned origin URL or null if invalid.
- */
 function validateInstanceUrl(input: string): { cleanUrl: string | null; error: string | null } {
   const trimmed = input.trim();
   if (!trimmed) return { cleanUrl: null, error: "URL is required" };
 
-  // Add https:// if no protocol provided
   const withProtocol = trimmed.match(/^https?:\/\//) ? trimmed : `https://${trimmed}`;
 
   try {
     const parsed = new URL(withProtocol);
 
-    // Must be https (or http for dev instances)
     if (!["https:", "http:"].includes(parsed.protocol)) {
       return { cleanUrl: null, error: "URL must use https:// or http://" };
     }
 
-    // Basic hostname validation - should look like a ServiceNow instance
     if (!parsed.hostname.includes(".")) {
       return { cleanUrl: null, error: "Enter a full hostname (e.g., instance.service-now.com)" };
     }
@@ -78,6 +67,8 @@ export default function InstancesPage() {
   const [urlError, setUrlError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const fetchInstances = () => {
     fetch("/api/instances")
@@ -90,10 +81,15 @@ export default function InstancesPage() {
     fetchInstances();
   }, []);
 
-  const openCreate = () => {
+  const resetDialog = () => {
     setEditingInstance(null);
     setForm(emptyForm);
     setUrlError(null);
+    setTestResult(null);
+  };
+
+  const openCreate = () => {
+    resetDialog();
     setDialogOpen(true);
   };
 
@@ -106,13 +102,14 @@ export default function InstancesPage() {
       password: "",
     });
     setUrlError(null);
+    setTestResult(null);
     setDialogOpen(true);
   };
 
   const handleUrlChange = (value: string) => {
     setForm((f) => ({ ...f, url: value }));
-    // Clear error while typing, validate on blur
     if (urlError) setUrlError(null);
+    if (testResult) setTestResult(null);
   };
 
   const handleUrlBlur = () => {
@@ -124,7 +121,6 @@ export default function InstancesPage() {
     if (error) {
       setUrlError(error);
     } else if (cleanUrl && cleanUrl !== form.url) {
-      // Auto-correct the URL to the clean version
       setForm((f) => ({ ...f, url: cleanUrl }));
       setUrlError(null);
     } else {
@@ -132,8 +128,41 @@ export default function InstancesPage() {
     }
   };
 
+  const handleTestConnection = async () => {
+    const { cleanUrl, error } = validateInstanceUrl(form.url);
+    if (error || !cleanUrl) {
+      setUrlError(error || "Invalid URL");
+      return;
+    }
+
+    if (!form.username || !form.password) {
+      setTestResult({ success: false, message: "Username and password are required to test connection." });
+      return;
+    }
+
+    setTesting(true);
+    setTestResult(null);
+
+    try {
+      const res = await fetch("/api/instances/test-connection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: cleanUrl, username: form.username, password: form.password }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setTestResult({ success: true, message: data.message });
+      } else {
+        setTestResult({ success: false, message: data.error });
+      }
+    } catch {
+      setTestResult({ success: false, message: "Failed to reach the test endpoint." });
+    } finally {
+      setTesting(false);
+    }
+  };
+
   const handleSave = async () => {
-    // Validate URL before saving
     const { cleanUrl, error } = validateInstanceUrl(form.url);
     if (error || !cleanUrl) {
       setUrlError(error || "Invalid URL");
@@ -159,9 +188,7 @@ export default function InstancesPage() {
         if (!res.ok) throw new Error("Failed to create instance");
       }
       setDialogOpen(false);
-      setForm(emptyForm);
-      setEditingInstance(null);
-      setUrlError(null);
+      resetDialog();
       fetchInstances();
     } catch (err) {
       console.error(err);
@@ -190,6 +217,7 @@ export default function InstancesPage() {
   const canSave = isCreateMode
     ? form.name && form.url && form.username && form.password && !urlError
     : form.name && form.url && form.username && !urlError;
+  const canTest = form.url && form.username && form.password && !urlError;
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -197,11 +225,7 @@ export default function InstancesPage() {
         <h1 className="text-2xl font-bold">ServiceNow Instances</h1>
         <Dialog open={dialogOpen} onOpenChange={(open) => {
           setDialogOpen(open);
-          if (!open) {
-            setEditingInstance(null);
-            setForm(emptyForm);
-            setUrlError(null);
-          }
+          if (!open) resetDialog();
         }}>
           <DialogTrigger asChild>
             <Button onClick={openCreate}>Add Instance</Button>
@@ -268,6 +292,25 @@ export default function InstancesPage() {
                   }
                 />
               </div>
+
+              {/* Test Connection */}
+              <div className="flex items-center gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleTestConnection}
+                  disabled={testing || !canTest}
+                  className="shrink-0"
+                >
+                  {testing ? "Testing..." : "Test Connection"}
+                </Button>
+                {testResult && (
+                  <p className={`text-sm ${testResult.success ? "text-green-600" : "text-destructive"}`}>
+                    {testResult.message}
+                  </p>
+                )}
+              </div>
+
               <Button
                 onClick={handleSave}
                 disabled={saving || !canSave}
