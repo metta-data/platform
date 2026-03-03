@@ -36,11 +36,46 @@ interface Instance {
 
 const emptyForm = { name: "", url: "", username: "", password: "" };
 
+/**
+ * Validates and cleans a ServiceNow instance URL.
+ * Accepts formats like:
+ *   https://instance.service-now.com
+ *   instance.service-now.com
+ *   https://instance.service-now.com/login.do?...
+ * Returns the cleaned origin URL or null if invalid.
+ */
+function validateInstanceUrl(input: string): { cleanUrl: string | null; error: string | null } {
+  const trimmed = input.trim();
+  if (!trimmed) return { cleanUrl: null, error: "URL is required" };
+
+  // Add https:// if no protocol provided
+  const withProtocol = trimmed.match(/^https?:\/\//) ? trimmed : `https://${trimmed}`;
+
+  try {
+    const parsed = new URL(withProtocol);
+
+    // Must be https (or http for dev instances)
+    if (!["https:", "http:"].includes(parsed.protocol)) {
+      return { cleanUrl: null, error: "URL must use https:// or http://" };
+    }
+
+    // Basic hostname validation - should look like a ServiceNow instance
+    if (!parsed.hostname.includes(".")) {
+      return { cleanUrl: null, error: "Enter a full hostname (e.g., instance.service-now.com)" };
+    }
+
+    return { cleanUrl: parsed.origin, error: null };
+  } catch {
+    return { cleanUrl: null, error: "Invalid URL format" };
+  }
+}
+
 export default function InstancesPage() {
   const [instances, setInstances] = useState<Instance[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingInstance, setEditingInstance] = useState<Instance | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [urlError, setUrlError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -58,6 +93,7 @@ export default function InstancesPage() {
   const openCreate = () => {
     setEditingInstance(null);
     setForm(emptyForm);
+    setUrlError(null);
     setDialogOpen(true);
   };
 
@@ -67,34 +103,65 @@ export default function InstancesPage() {
       name: inst.name,
       url: inst.url,
       username: inst.username,
-      password: "", // Don't pre-fill password
+      password: "",
     });
+    setUrlError(null);
     setDialogOpen(true);
   };
 
+  const handleUrlChange = (value: string) => {
+    setForm((f) => ({ ...f, url: value }));
+    // Clear error while typing, validate on blur
+    if (urlError) setUrlError(null);
+  };
+
+  const handleUrlBlur = () => {
+    if (!form.url.trim()) {
+      setUrlError(null);
+      return;
+    }
+    const { cleanUrl, error } = validateInstanceUrl(form.url);
+    if (error) {
+      setUrlError(error);
+    } else if (cleanUrl && cleanUrl !== form.url) {
+      // Auto-correct the URL to the clean version
+      setForm((f) => ({ ...f, url: cleanUrl }));
+      setUrlError(null);
+    } else {
+      setUrlError(null);
+    }
+  };
+
   const handleSave = async () => {
+    // Validate URL before saving
+    const { cleanUrl, error } = validateInstanceUrl(form.url);
+    if (error || !cleanUrl) {
+      setUrlError(error || "Invalid URL");
+      return;
+    }
+
     setSaving(true);
     try {
+      const payload = { ...form, url: cleanUrl };
       if (editingInstance) {
-        // Update existing
         const res = await fetch(`/api/instances/${editingInstance.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
+          body: JSON.stringify(payload),
         });
         if (!res.ok) throw new Error("Failed to update instance");
       } else {
-        // Create new
         const res = await fetch("/api/instances", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
+          body: JSON.stringify(payload),
         });
         if (!res.ok) throw new Error("Failed to create instance");
       }
       setDialogOpen(false);
       setForm(emptyForm);
       setEditingInstance(null);
+      setUrlError(null);
       fetchInstances();
     } catch (err) {
       console.error(err);
@@ -121,8 +188,8 @@ export default function InstancesPage() {
 
   const isCreateMode = !editingInstance;
   const canSave = isCreateMode
-    ? form.name && form.url && form.username && form.password
-    : form.name && form.url && form.username;
+    ? form.name && form.url && form.username && form.password && !urlError
+    : form.name && form.url && form.username && !urlError;
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -133,6 +200,7 @@ export default function InstancesPage() {
           if (!open) {
             setEditingInstance(null);
             setForm(emptyForm);
+            setUrlError(null);
           }
         }}>
           <DialogTrigger asChild>
@@ -153,7 +221,7 @@ export default function InstancesPage() {
               <div>
                 <label className="text-sm font-medium">Name</label>
                 <Input
-                  placeholder="e.g., Production"
+                  placeholder="e.g., Production, Dev Zurich"
                   value={form.name}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, name: e.target.value }))
@@ -163,12 +231,19 @@ export default function InstancesPage() {
               <div>
                 <label className="text-sm font-medium">Instance URL</label>
                 <Input
-                  placeholder="https://instance.service-now.com"
+                  placeholder="https://myinstance.service-now.com"
                   value={form.url}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, url: e.target.value }))
-                  }
+                  onChange={(e) => handleUrlChange(e.target.value)}
+                  onBlur={handleUrlBlur}
+                  aria-invalid={!!urlError}
                 />
+                {urlError ? (
+                  <p className="text-sm text-destructive mt-1">{urlError}</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    e.g., https://dev12345.service-now.com
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-sm font-medium">Username</label>
@@ -231,7 +306,9 @@ export default function InstancesPage() {
               {instances.map((inst) => (
                 <TableRow key={inst.id}>
                   <TableCell className="font-medium">{inst.name}</TableCell>
-                  <TableCell className="font-mono text-sm">{inst.url}</TableCell>
+                  <TableCell className="font-mono text-sm max-w-[300px] truncate">
+                    {inst.url}
+                  </TableCell>
                   <TableCell>{inst.username}</TableCell>
                   <TableCell>{inst._count.snapshots}</TableCell>
                   <TableCell className="text-right space-x-2">
