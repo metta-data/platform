@@ -1,0 +1,156 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================
+// Admin / Instance Management
+// ============================================
+
+model ServiceNowInstance {
+  id                String   @id @default(cuid())
+  name              String
+  url               String
+  username          String
+  encryptedPassword String   @map("encrypted_password")
+  isActive          Boolean  @default(true) @map("is_active")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  snapshots         SchemaSnapshot[]
+
+  @@map("servicenow_instances")
+}
+
+// ============================================
+// Schema Snapshots (versioned)
+// ============================================
+
+model SchemaSnapshot {
+  id                String             @id @default(cuid())
+  label             String
+  version           String?
+  description       String?
+  instanceId        String?            @map("instance_id")
+  instance          ServiceNowInstance? @relation(fields: [instanceId], references: [id])
+  sourceType        SnapshotSourceType @default(INGESTION) @map("source_type")
+  status            SnapshotStatus     @default(PENDING)
+  tableCount        Int                @default(0) @map("table_count")
+  columnCount       Int                @default(0) @map("column_count")
+  ingestStartedAt   DateTime?          @map("ingest_started_at")
+  ingestCompletedAt DateTime?          @map("ingest_completed_at")
+  errorMessage      String?            @map("error_message")
+  isBaseline        Boolean            @default(false) @map("is_baseline")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+
+  tables            SnapshotTable[]
+
+  @@index([label])
+  @@index([isBaseline])
+  @@map("schema_snapshots")
+}
+
+enum SnapshotSourceType {
+  INGESTION
+  UPLOAD_JSON
+  UPLOAD_CSV
+}
+
+enum SnapshotStatus {
+  PENDING
+  INGESTING_TABLES
+  INGESTING_COLUMNS
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// ============================================
+// Table Metadata
+// ============================================
+
+model SnapshotTable {
+  id               String         @id @default(cuid())
+  snapshotId       String         @map("snapshot_id")
+  snapshot         SchemaSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  sysId            String         @map("sys_id")
+  name             String
+  label            String
+
+  superClassName   String?        @map("super_class_name")
+
+  scopeName        String?        @map("scope_name")
+  scopeLabel       String?        @map("scope_label")
+
+  isExtendable     Boolean        @default(true) @map("is_extendable")
+  accessibleFrom   String?        @map("accessible_from")
+  numberPrefix     String?        @map("number_prefix")
+
+  ownColumnCount   Int            @default(0) @map("own_column_count")
+  totalColumnCount Int            @default(0) @map("total_column_count")
+  childTableCount  Int            @default(0) @map("child_table_count")
+
+  columns          SnapshotColumn[]
+
+  @@unique([snapshotId, name])
+  @@index([snapshotId])
+  @@index([superClassName])
+  @@index([scopeName])
+  @@index([name])
+  @@map("snapshot_tables")
+}
+
+// ============================================
+// Column / Field Metadata
+// ============================================
+
+model SnapshotColumn {
+  id              String        @id @default(cuid())
+  tableId         String        @map("table_id")
+  table           SnapshotTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+  sysId           String        @map("sys_id")
+  element         String
+  label           String
+
+  definedOnTable  String        @map("defined_on_table")
+
+  internalType    String        @map("internal_type")
+
+  referenceTable  String?       @map("reference_table")
+
+  maxLength       Int?          @map("max_length")
+  isMandatory     Boolean       @default(false) @map("is_mandatory")
+  isReadOnly      Boolean       @default(false) @map("is_read_only")
+  isActive        Boolean       @default(true) @map("is_active")
+  isDisplay       Boolean       @default(false) @map("is_display")
+  isPrimary       Boolean       @default(false) @map("is_primary")
+
+  defaultValue    String?       @map("default_value")
+  attributes      Json?         @default("{}")
+
+  @@unique([tableId, element])
+  @@index([tableId])
+  @@index([definedOnTable])
+  @@index([element])
+  @@index([internalType])
+  @@map("snapshot_columns")
+}
+
+// ============================================
+// Admin User
+// ============================================
+
+model AdminUser {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  hashedPassword String   @map("hashed_password")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@map("admin_users")
+}
