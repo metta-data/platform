@@ -38,6 +38,16 @@ export async function GET(request: Request) {
 
   // Build lookup maps
   const tableMap = new Map(allTables.map((t) => [t.name, t]));
+  // Label → name map: referenceTable may be stored as display label (e.g. "Asset")
+  // instead of table name (e.g. "alm_asset") due to sysparm_display_value=all
+  const labelToName = new Map<string, string>();
+  for (const t of allTables) {
+    // Only set if label isn't already taken (labels aren't guaranteed unique,
+    // but name→name takes priority via tableMap check in resolveRefTable)
+    if (!labelToName.has(t.label)) {
+      labelToName.set(t.label, t.name);
+    }
+  }
   const childrenMap = new Map<string, string[]>();
   for (const t of allTables) {
     if (t.superClassName) {
@@ -140,24 +150,31 @@ export async function GET(request: Request) {
 
     for (const col of refColumns) {
       if (!col.referenceTable) continue;
+
+      // Resolve referenceTable — may be stored as table name OR display label
+      const refName = tableMap.has(col.referenceTable)
+        ? col.referenceTable // already a valid table name
+        : labelToName.get(col.referenceTable) || null; // try as label
+
+      if (!refName) continue;
       // Skip self-references
-      if (col.referenceTable === col.table.name) continue;
+      if (refName === col.table.name) continue;
 
       edges.push({
         source: col.table.name,
-        target: col.referenceTable,
+        target: refName,
         type: "reference",
         label: col.element,
       });
 
       // Add the referenced table as a mini node if not already included
       if (
-        !nodeDistance.has(col.referenceTable) &&
-        tableMap.has(col.referenceTable) &&
+        !nodeDistance.has(refName) &&
+        tableMap.has(refName) &&
         nodeDistance.size < MAX_NODES
       ) {
         // Reference targets are always beyond detail depth (never detailed)
-        nodeDistance.set(col.referenceTable, depth + 1);
+        nodeDistance.set(refName, depth + 1);
       }
     }
   }

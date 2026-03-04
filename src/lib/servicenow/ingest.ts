@@ -119,6 +119,14 @@ export async function ingestFromInstance(
       .map((r) => ServiceNowClient.parseColumnRecord(r))
       .filter((c) => tableNameSet.has(c.definedOnTable));
 
+    // Resolve referenceTable: reference field value = sys_id of target table in sys_db_object
+    // Use the same sysIdToName map built for super_class resolution
+    for (const col of parsedColumns) {
+      if (col.referenceTableSysId) {
+        col.referenceTable = sysIdToName.get(col.referenceTableSysId) || null;
+      }
+    }
+
     // Insert columns in batches, linked to their defining table
     let insertedCount = 0;
     for (let i = 0; i < parsedColumns.length; i += DB_BATCH_SIZE) {
@@ -127,7 +135,9 @@ export async function ingestFromInstance(
         .map((c) => {
           const tableId = tableIdMap.get(c.definedOnTable);
           if (!tableId) return null;
-          return { tableId, ...c };
+          // Strip referenceTableSysId (not a DB column)
+          const { referenceTableSysId: _, ...rest } = c;
+          return { tableId, ...rest };
         })
         .filter((d): d is NonNullable<typeof d> => d !== null);
 

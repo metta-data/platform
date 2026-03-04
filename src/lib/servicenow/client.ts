@@ -240,7 +240,10 @@ export class ServiceNowClient {
       label: getDisplayValue(record.column_label) || element,
       definedOnTable: getValue(record.name),
       internalType: getDisplayValue(record.internal_type) || "string",
-      referenceTable: getDisplayValue(record.reference) || null,
+      // reference is a reference field to sys_db_object: value = sys_id of target table
+      // We store the sys_id here and resolve to table name during ingestion post-processing
+      referenceTableSysId: getValue(record.reference) || null,
+      referenceTable: null as string | null, // resolved post-parse via sysId lookup
       maxLength: getValue(record.max_length) ? parseInt(getValue(record.max_length), 10) : null,
       isMandatory: getValue(record.mandatory) === "true",
       isReadOnly: getValue(record.read_only) === "true",
