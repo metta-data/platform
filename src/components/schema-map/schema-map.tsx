@@ -311,7 +311,14 @@ function SchemaMapInner() {
   const nodes = useMemo(() => {
     if (!graphData || !selectedSnapshotId) return [];
 
-    const rfNodes: Node[] = graphData.nodes.map((n) => ({
+    // Filter nodes based on view mode:
+    // showRefs = true  → center table + reference targets only
+    // showRefs = false → hierarchy only (exclude ref-only targets)
+    const visibleGraphNodes = showRefs
+      ? graphData.nodes.filter((n) => n.isCenter || n.isReferenceTarget)
+      : graphData.nodes.filter((n) => !n.isReferenceTarget);
+
+    const rfNodes: Node[] = visibleGraphNodes.map((n) => ({
       id: n.name,
       type: n.isDetailed ? "tableNode" : "miniNode",
       position: { x: 0, y: 0 },
@@ -368,6 +375,7 @@ function SchemaMapInner() {
   }, [
     graphData,
     selectedSnapshotId,
+    showRefs,
     expandedNodes,
     expandedGroups,
     direction,
@@ -379,7 +387,7 @@ function SchemaMapInner() {
     highlightedRefField,
   ]);
 
-  // Fit view only when new graph data loads (not on expand/collapse)
+  // Fit view when new graph data loads or view mode changes
   useEffect(() => {
     if (graphData && nodes.length > 0) {
       requestAnimationFrame(() => {
@@ -387,7 +395,7 @@ function SchemaMapInner() {
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graphData, fitView]);
+  }, [graphData, showRefs, fitView]);
 
   // -----------------------------------------------------------------------
   // Compute edges reactively from graph data + expansion state
@@ -395,13 +403,18 @@ function SchemaMapInner() {
   const edges = useMemo(() => {
     if (!graphData) return [];
 
+    // Filter edges by view mode: refs view → reference edges, hierarchy view → inheritance edges
+    const visibleEdges = showRefs
+      ? graphData.edges.filter((e) => e.type === "reference")
+      : graphData.edges.filter((e) => e.type === "inheritance");
+
     const includedNames = new Set(graphData.nodes.map((n) => n.name));
     const refTargetSet = new Set(
       graphData.nodes.filter((n) => n.isReferenceTarget).map((n) => n.name)
     );
 
     return buildEdgesFromGraphData(
-      graphData.edges,
+      visibleEdges,
       includedNames,
       refTargetSet,
       expandedNodes,
@@ -412,6 +425,7 @@ function SchemaMapInner() {
     );
   }, [
     graphData,
+    showRefs,
     expandedNodes,
     expandedGroups,
     columnsLoadedNodes,

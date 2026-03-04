@@ -60,9 +60,33 @@ export function MapToolbar({
 
       <div className="w-px h-5 bg-border" />
 
-      {/* Depth selector */}
-      <div className="flex items-center gap-1">
-        <GitBranch className="w-3.5 h-3.5 text-muted-foreground" />
+      {/* View mode toggle */}
+      <div className="flex items-center rounded-md border overflow-hidden">
+        <Button
+          variant={!showRefs ? "default" : "ghost"}
+          size="sm"
+          className="h-7 text-xs gap-1 rounded-none border-0"
+          onClick={showRefs ? onToggleRefs : undefined}
+        >
+          <GitBranch className="w-3 h-3" />
+          Hierarchy
+        </Button>
+        <div className="w-px h-5 bg-border" />
+        <Button
+          variant={showRefs ? "default" : "ghost"}
+          size="sm"
+          className="h-7 text-xs gap-1 rounded-none border-0"
+          onClick={!showRefs ? onToggleRefs : undefined}
+        >
+          <ArrowUpRight className="w-3 h-3" />
+          References
+        </Button>
+      </div>
+
+      <div className="w-px h-5 bg-border" />
+
+      {/* Depth selector — only relevant in hierarchy mode */}
+      <div className={`flex items-center gap-1 transition-opacity ${showRefs ? "opacity-40 pointer-events-none" : ""}`}>
         <Select
           value={String(depth)}
           onValueChange={(v) => onDepthChange(parseInt(v, 10))}
@@ -78,24 +102,11 @@ export function MapToolbar({
         </Select>
       </div>
 
-      <div className="w-px h-5 bg-border" />
-
-      {/* Toggle references */}
-      <Button
-        variant={showRefs ? "default" : "outline"}
-        size="sm"
-        className="h-7 text-xs gap-1"
-        onClick={onToggleRefs}
-      >
-        <ArrowUpRight className="w-3 h-3" />
-        Refs
-      </Button>
-
-      {/* Layout direction */}
+      {/* Layout direction — only relevant in hierarchy mode */}
       <Button
         variant="outline"
         size="sm"
-        className="h-7 text-xs gap-1"
+        className={`h-7 text-xs gap-1 transition-opacity ${showRefs ? "opacity-40 pointer-events-none" : ""}`}
         onClick={() => onDirectionChange(direction === "TB" ? "LR" : "TB")}
         title={direction === "TB" ? "Top-to-bottom" : "Left-to-right"}
       >
