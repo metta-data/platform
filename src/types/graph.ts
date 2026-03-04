@@ -11,6 +11,8 @@ export interface GraphNode {
   isTruncated: boolean;
   /** True for the center table and tables within `depth` distance */
   isDetailed: boolean;
+  /** True if this node exists only because it's a reference target (not in the hierarchy) */
+  isReferenceTarget: boolean;
 }
 
 export interface GraphEdge {

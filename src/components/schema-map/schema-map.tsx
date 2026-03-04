@@ -138,6 +138,7 @@ function SchemaMapInner() {
             isCenter: n.isCenter,
             isTruncated: n.isTruncated,
             isDetailed: n.isDetailed,
+            isReferenceTarget: n.isReferenceTarget,
             expanded: expandedNodes.has(n.name),
             columnCount: n.ownColumnCount,
             snapshotId: selectedSnapshotId,

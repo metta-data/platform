@@ -124,20 +124,15 @@ export async function GET(request: Request) {
     }
   }
 
-  // 3. Optionally include reference targets (only from detailed nodes)
-  if (includeRefs && nodeDistance.size < MAX_NODES) {
-    // Only get references from detailed nodes (within depth range)
-    const detailedNames = Array.from(nodeDistance.entries())
-      .filter(([, dist]) => dist <= depth)
-      .map(([name]) => name);
+  // 3. Optionally include reference targets (only from the center table to keep it clean)
+  const referenceTargetNames = new Set<string>();
 
-    // Use referenceTable not-null as the indicator (internalType display value
-    // varies by instance — "Reference", "reference", "Glide Reference", etc.)
+  if (includeRefs && nodeDistance.size < MAX_NODES) {
     const refColumns = await prisma.snapshotColumn.findMany({
       where: {
         table: {
           snapshotId,
-          name: { in: detailedNames },
+          name: centerTable,
         },
         referenceTable: { not: null },
       },
@@ -148,33 +143,45 @@ export async function GET(request: Request) {
       },
     });
 
+    // Group references by resolved target table name
+    // so we get one edge per target with a combined label
+    const refsByTarget = new Map<string, string[]>();
+
     for (const col of refColumns) {
       if (!col.referenceTable) continue;
 
       // Resolve referenceTable — may be stored as table name OR display label
       const refName = tableMap.has(col.referenceTable)
-        ? col.referenceTable // already a valid table name
-        : labelToName.get(col.referenceTable) || null; // try as label
+        ? col.referenceTable
+        : labelToName.get(col.referenceTable) || null;
 
       if (!refName) continue;
-      // Skip self-references
-      if (refName === col.table.name) continue;
+      // Skip references to self or tables already in hierarchy
+      if (refName === centerTable) continue;
+
+      const existing = refsByTarget.get(refName) || [];
+      existing.push(col.element);
+      refsByTarget.set(refName, existing);
+    }
+
+    // Create one edge per unique target, label with column count if multiple
+    for (const [refName, columns] of refsByTarget) {
+      const label =
+        columns.length <= 2
+          ? columns.join(", ")
+          : `${columns[0]} +${columns.length - 1}`;
 
       edges.push({
-        source: col.table.name,
+        source: centerTable,
         target: refName,
         type: "reference",
-        label: col.element,
+        label,
       });
 
-      // Add the referenced table as a mini node if not already included
-      if (
-        !nodeDistance.has(refName) &&
-        tableMap.has(refName) &&
-        nodeDistance.size < MAX_NODES
-      ) {
-        // Reference targets are always beyond detail depth (never detailed)
+      // Add the referenced table as a node if not already included
+      if (!nodeDistance.has(refName) && tableMap.has(refName)) {
         nodeDistance.set(refName, depth + 1);
+        referenceTargetNames.add(refName);
       }
     }
   }
@@ -206,6 +213,7 @@ export async function GET(request: Request) {
       isCenter: t.name === centerTable,
       isTruncated: includedChildren < totalChildren,
       isDetailed: distance <= depth,
+      isReferenceTarget: referenceTargetNames.has(t.name),
     });
   }
 
