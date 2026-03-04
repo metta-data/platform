@@ -37,7 +37,7 @@ export async function ingestFromInstance(
       });
     });
 
-    // Insert tables in batches
+    // Parse tables and resolve superClassName via sys_id lookup
     const parsedTables = rawTables.map((r) =>
       ServiceNowClient.parseTableRecord(r)
     );
@@ -48,10 +48,20 @@ export async function ingestFromInstance(
       );
     }
 
+    // Resolve superClassName: super_class is a reference field where value = sys_id
+    // Build sysId → name lookup, then resolve each table's parent name
+    const sysIdToName = new Map(parsedTables.map((t) => [t.sysId, t.name]));
+    for (const table of parsedTables) {
+      if (table.superClassSysId) {
+        table.superClassName = sysIdToName.get(table.superClassSysId) || null;
+      }
+    }
+
+    // Remove superClassSysId before DB insertion (not a DB column)
     for (let i = 0; i < parsedTables.length; i += DB_BATCH_SIZE) {
       const batch = parsedTables.slice(i, i + DB_BATCH_SIZE);
       await prisma.snapshotTable.createMany({
-        data: batch.map((t) => ({
+        data: batch.map(({ superClassSysId: _, ...t }) => ({
           snapshotId,
           ...t,
         })),
@@ -147,6 +157,15 @@ export async function ingestFromInstance(
       phase: "processing",
       current: 0,
       total: 1,
+      message: "Resolving column inheritance...",
+    });
+
+    await computeDefinedOnTable(snapshotId);
+
+    onProgress?.({
+      phase: "processing",
+      current: 0,
+      total: 1,
       message: "Computing table statistics...",
     });
 
@@ -195,6 +214,80 @@ export async function ingestFromInstance(
     });
 
     throw error;
+  }
+}
+
+/**
+ * ServiceNow duplicates sys_dictionary entries at every level of the hierarchy.
+ * A column like "asset" on cmdb_ci has separate dictionary entries for cmdb_ci,
+ * cmdb_ci_hardware, cmdb_ci_computer, cmdb_ci_server, etc.
+ *
+ * This function resolves each column's true `definedOnTable` by finding the
+ * topmost ancestor in the inheritance chain that also has that column element.
+ */
+async function computeDefinedOnTable(snapshotId: string): Promise<void> {
+  // Fetch all tables with their column elements
+  const tables = await prisma.snapshotTable.findMany({
+    where: { snapshotId },
+    select: {
+      id: true,
+      name: true,
+      superClassName: true,
+      columns: { select: { id: true, element: true } },
+    },
+  });
+
+  const tableByName = new Map(tables.map((t) => [t.name, t]));
+
+  // Pre-build column element sets for each table
+  const tableElements = new Map<string, Set<string>>();
+  for (const t of tables) {
+    tableElements.set(t.name, new Set(t.columns.map((c) => c.element)));
+  }
+
+  // For each table, determine the true introducing table for each column
+  const updates: { id: string; definedOnTable: string }[] = [];
+
+  for (const table of tables) {
+    if (!table.superClassName) continue; // root tables — all columns are own
+
+    // Build inheritance chain: [self, parent, grandparent, ..., root]
+    const chain: string[] = [table.name];
+    let p: string | null = table.superClassName;
+    while (p && tableByName.has(p)) {
+      chain.push(p);
+      p = tableByName.get(p)!.superClassName;
+    }
+
+    if (chain.length <= 1) continue; // no ancestors
+
+    // Walk from root → leaf to find where each column was first introduced
+    const reversedChain = [...chain].reverse(); // root first
+
+    for (const col of table.columns) {
+      // Find the topmost ancestor that has this column element
+      for (const ancestor of reversedChain) {
+        if (tableElements.get(ancestor)?.has(col.element)) {
+          if (ancestor !== table.name) {
+            updates.push({ id: col.id, definedOnTable: ancestor });
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  // Batch update in chunks
+  for (let i = 0; i < updates.length; i += DB_BATCH_SIZE) {
+    const batch = updates.slice(i, i + DB_BATCH_SIZE);
+    await Promise.all(
+      batch.map((u) =>
+        prisma.snapshotColumn.update({
+          where: { id: u.id },
+          data: { definedOnTable: u.definedOnTable },
+        })
+      )
+    );
   }
 }
 

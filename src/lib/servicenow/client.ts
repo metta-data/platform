@@ -219,7 +219,10 @@ export class ServiceNowClient {
       sysId,
       name,
       label: getDisplayValue(record.label) || name,
-      superClassName: getDisplayValue(record.super_class) || null,
+      // super_class is a reference field: value = sys_id of parent, display_value = label
+      // We store the sys_id here and resolve to table name after all tables are parsed
+      superClassSysId: getValue(record.super_class) || null,
+      superClassName: null as string | null, // resolved post-parse via sysId lookup
       scopeName: getValue(record.sys_scope) || null,
       scopeLabel: getDisplayValue(record.sys_scope) || null,
       isExtendable: getValue(record.is_extendable) === "true",
