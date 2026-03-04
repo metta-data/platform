@@ -139,13 +139,17 @@ export async function GET(request: Request) {
       select: {
         element: true,
         referenceTable: true,
+        definedOnTable: true,
         table: { select: { name: true } },
       },
     });
 
     // Group references by resolved target table name
     // so we get one edge per target with a combined label
-    const refsByTarget = new Map<string, string[]>();
+    const refsByTarget = new Map<
+      string,
+      { element: string; definedOnTable: string }[]
+    >();
 
     for (const col of refColumns) {
       if (!col.referenceTable) continue;
@@ -160,22 +164,26 @@ export async function GET(request: Request) {
       if (refName === centerTable) continue;
 
       const existing = refsByTarget.get(refName) || [];
-      existing.push(col.element);
+      existing.push({
+        element: col.element,
+        definedOnTable: col.definedOnTable || centerTable,
+      });
       refsByTarget.set(refName, existing);
     }
 
     // Create one edge per unique target, label with column count if multiple
-    for (const [refName, columns] of refsByTarget) {
+    for (const [refName, fields] of refsByTarget) {
       const label =
-        columns.length <= 2
-          ? columns.join(", ")
-          : `${columns[0]} +${columns.length - 1}`;
+        fields.length <= 2
+          ? fields.map((f) => f.element).join(", ")
+          : `${fields[0].element} +${fields.length - 1}`;
 
       edges.push({
         source: centerTable,
         target: refName,
         type: "reference",
         label,
+        fields,
       });
 
       // Add the referenced table as a node if not already included

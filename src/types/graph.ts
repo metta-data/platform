@@ -20,6 +20,8 @@ export interface GraphEdge {
   target: string;
   type: "inheritance" | "reference";
   label?: string;
+  /** Per-field info for reference edges (for dynamic handle pinning) */
+  fields?: { element: string; definedOnTable: string }[];
 }
 
 export interface GraphResponse {

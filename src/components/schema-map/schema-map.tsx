@@ -13,7 +13,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useExplorerStore } from "@/stores/explorer-store";
-import type { GraphResponse } from "@/types/graph";
+import type { GraphResponse, GraphEdge } from "@/types/graph";
 import { TableNode } from "./table-node";
 import { MiniNode } from "./mini-node";
 import { InheritanceEdge, ReferenceEdge } from "./custom-edges";
@@ -30,19 +30,136 @@ const edgeTypes = {
   reference: ReferenceEdge,
 };
 
+// ---------------------------------------------------------------------------
+// Edge-building helpers
+// ---------------------------------------------------------------------------
+
+function buildEdgesFromGraphData(
+  graphEdges: GraphEdge[],
+  includedNames: Set<string>,
+  refTargetSet: Set<string>,
+  expandedNodes: Set<string>,
+  expandedGroups: Map<string, Set<string>>,
+  columnsLoadedNodes: Set<string>,
+  direction: "TB" | "LR"
+): Edge[] {
+  const inhSource = direction === "TB" ? "bottom" : "right";
+  const inhTarget = direction === "TB" ? "top" : "left";
+
+  const result: Edge[] = [];
+  let edgeIdx = 0;
+
+  for (const e of graphEdges) {
+    if (!includedNames.has(e.source) || !includedNames.has(e.target)) continue;
+
+    // --- Inheritance edges ---
+    if (e.type === "inheritance") {
+      result.push({
+        id: `${e.source}-${e.target}-inh-${edgeIdx++}`,
+        source: e.source,
+        target: e.target,
+        type: "inheritance",
+        data: { type: "inheritance", label: e.label },
+        animated: false,
+        sourceHandle: inhSource,
+        targetHandle: inhTarget,
+      });
+      continue;
+    }
+
+    // --- Reference edges ---
+    const targetIsRefOnly = refTargetSet.has(e.target);
+    const targetHandle = targetIsRefOnly ? "left" : "right-target";
+
+    const isSourceExpanded =
+      expandedNodes.has(e.source) && columnsLoadedNodes.has(e.source);
+
+    if (!isSourceExpanded || !e.fields) {
+      // Collapsed: single edge with label, generic right handle
+      result.push({
+        id: `${e.source}-${e.target}-ref-${edgeIdx++}`,
+        source: e.source,
+        target: e.target,
+        type: "reference",
+        data: { type: "reference", label: e.label },
+        animated: true,
+        sourceHandle: "right",
+        targetHandle,
+      });
+      continue;
+    }
+
+    // Expanded: split by group / field
+    const nodeGroups = expandedGroups.get(e.source) || new Set<string>();
+
+    // Group fields by definedOnTable
+    const fieldsByGroup = new Map<
+      string,
+      { element: string; definedOnTable: string }[]
+    >();
+    for (const field of e.fields) {
+      const group = fieldsByGroup.get(field.definedOnTable) || [];
+      group.push(field);
+      fieldsByGroup.set(field.definedOnTable, group);
+    }
+
+    for (const [groupTable, fields] of fieldsByGroup) {
+      if (nodeGroups.has(groupTable)) {
+        // Group is expanded: one edge per field, pinned to field row
+        for (const field of fields) {
+          result.push({
+            id: `${e.source}-${e.target}-ref-${field.element}`,
+            source: e.source,
+            target: e.target,
+            type: "reference",
+            data: { type: "reference" }, // no label when expanded
+            animated: true,
+            sourceHandle: `ref-field-${field.element}`,
+            targetHandle,
+          });
+        }
+      } else {
+        // Group is collapsed: one edge per group, pinned to group header
+        result.push({
+          id: `${e.source}-${e.target}-ref-grp-${groupTable}`,
+          source: e.source,
+          target: e.target,
+          type: "reference",
+          data: { type: "reference" }, // no label when expanded
+          animated: true,
+          sourceHandle: `ref-group-${groupTable}`,
+          targetHandle,
+        });
+      }
+    }
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// SchemaMapInner
+// ---------------------------------------------------------------------------
+
 function SchemaMapInner() {
   const { selectedSnapshotId, selectedTable, setSelectedTable } =
     useExplorerStore();
   const { fitView } = useReactFlow();
 
   const [nodes, setNodes] = useState<Node[]>([]);
-  const [edges, setEdges] = useState<Edge[]>([]);
+  const [graphData, setGraphData] = useState<GraphResponse | null>(null);
   const [centerTable, setCenterTable] = useState<string | null>(null);
   const [depth, setDepth] = useState(2);
   const [showRefs, setShowRefs] = useState(true);
   const [direction, setDirection] = useState<"TB" | "LR">("TB");
   const [loading, setLoading] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+  const [expandedGroups, setExpandedGroups] = useState<
+    Map<string, Set<string>>
+  >(new Map());
+  const [columnsLoadedNodes, setColumnsLoadedNodes] = useState<Set<string>>(
+    new Set()
+  );
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -51,32 +168,95 @@ function SchemaMapInner() {
     if (selectedTable && selectedTable !== centerTable) {
       setCenterTable(selectedTable);
       setExpandedNodes(new Set());
+      setExpandedGroups(new Map());
+      setColumnsLoadedNodes(new Set());
     }
   }, [selectedTable, centerTable]);
 
-  // Handlers passed to nodes — defined before the effect that uses them
-  const handleToggleExpand = useCallback(
-    (nodeId: string) => {
-      setExpandedNodes((prev) => {
-        const next = new Set(prev);
-        if (next.has(nodeId)) {
-          next.delete(nodeId);
-        } else {
-          next.add(nodeId);
+  // -----------------------------------------------------------------------
+  // Handlers passed to nodes
+  // -----------------------------------------------------------------------
+
+  const handleToggleExpand = useCallback((nodeId: string) => {
+    setExpandedNodes((prev) => {
+      const next = new Set(prev);
+      if (next.has(nodeId)) {
+        next.delete(nodeId);
+      } else {
+        next.add(nodeId);
+      }
+      return next;
+    });
+
+    // Update node data to trigger re-render
+    // (expandedGroups & columnsLoadedNodes are preserved so edges snap
+    //  back to field-level handles immediately on re-expand)
+    setNodes((prev) =>
+      prev.map((n) => {
+        if (n.id === nodeId) {
+          return {
+            ...n,
+            data: {
+              ...n.data,
+              expanded: !n.data.expanded,
+            },
+          };
         }
+        return n;
+      })
+    );
+  }, []);
+
+  const handleToggleGroup = useCallback(
+    (nodeId: string, groupName: string) => {
+      setExpandedGroups((prev) => {
+        const next = new Map(prev);
+        const groups = new Set(next.get(nodeId) || []);
+        if (groups.has(groupName)) {
+          groups.delete(groupName);
+        } else {
+          groups.add(groupName);
+        }
+        next.set(nodeId, groups);
+
+        // Also update node data so TableNode re-renders with correct state
+        setNodes((prevNodes) =>
+          prevNodes.map((n) => {
+            if (n.id === nodeId) {
+              return {
+                ...n,
+                data: { ...n.data, expandedGroupNames: new Set(groups) },
+              };
+            }
+            return n;
+          })
+        );
+
+        return next;
+      });
+    },
+    []
+  );
+
+  const handleColumnsLoaded = useCallback(
+    (nodeId: string, ownTableName: string) => {
+      setColumnsLoadedNodes((prev) => new Set([...prev, nodeId]));
+
+      // Auto-expand own columns group
+      const groups = new Set([ownTableName]);
+      setExpandedGroups((prev) => {
+        const next = new Map(prev);
+        next.set(nodeId, groups);
         return next;
       });
 
-      // Update node data to trigger re-render
-      setNodes((prev) =>
-        prev.map((n) => {
+      // Update node data
+      setNodes((prevNodes) =>
+        prevNodes.map((n) => {
           if (n.id === nodeId) {
             return {
               ...n,
-              data: {
-                ...n.data,
-                expanded: !n.data.expanded,
-              },
+              data: { ...n.data, expandedGroupNames: new Set(groups) },
             };
           }
           return n;
@@ -91,15 +271,19 @@ function SchemaMapInner() {
       setCenterTable(tableName);
       setSelectedTable(tableName);
       setExpandedNodes(new Set());
+      setExpandedGroups(new Map());
+      setColumnsLoadedNodes(new Set());
     },
     [setSelectedTable]
   );
 
+  // -----------------------------------------------------------------------
   // Fetch graph data
+  // -----------------------------------------------------------------------
   useEffect(() => {
     if (!selectedSnapshotId || !centerTable) {
       setNodes([]);
-      setEdges([]);
+      setGraphData(null);
       return;
     }
 
@@ -122,11 +306,11 @@ function SchemaMapInner() {
       .then((data: GraphResponse) => {
         if (controller.signal.aborted) return;
 
-        // Convert to React Flow nodes — use tableNode for detailed, miniNode for others
+        // Convert to React Flow nodes
         const rfNodes: Node[] = data.nodes.map((n) => ({
           id: n.name,
           type: n.isDetailed ? "tableNode" : "miniNode",
-          position: { x: 0, y: 0 }, // Will be computed by layout
+          position: { x: 0, y: 0 },
           data: {
             label: n.label,
             name: n.name,
@@ -144,59 +328,37 @@ function SchemaMapInner() {
             snapshotId: selectedSnapshotId,
             onToggleExpand: handleToggleExpand,
             onDoubleClick: handleRecenter,
+            onToggleGroup: handleToggleGroup,
+            onColumnsLoaded: handleColumnsLoaded,
+            expandedGroupNames:
+              expandedGroups.get(n.name) || new Set<string>(),
           },
         }));
 
-        // Convert to React Flow edges — assign handles based on layout direction
-        // Inheritance flows with the direction (TB: top→bottom, LR: left→right)
+        // Build temporary edges for layout (only inheritance drives dagre)
         const inhSource = direction === "TB" ? "bottom" : "right";
         const inhTarget = direction === "TB" ? "top" : "left";
-
-        // Build set of reference-only target names for handle routing
-        const refTargetSet = new Set(
-          data.nodes.filter((n) => n.isReferenceTarget).map((n) => n.name)
-        );
-
-        const rfEdges: Edge[] = data.edges.map((e, i) => {
-          if (e.type === "inheritance") {
-            return {
-              id: `${e.source}-${e.target}-${e.type}-${i}`,
-              source: e.source,
-              target: e.target,
-              type: e.type,
-              data: { type: e.type, label: e.label },
-              animated: false,
-              sourceHandle: inhSource,
-              targetHandle: inhTarget,
-            };
-          }
-
-          // Reference edge: route depends on whether target is in hierarchy or to the side
-          const targetIsRefOnly = refTargetSet.has(e.target);
-
-          return {
-            id: `${e.source}-${e.target}-${e.type}-${i}`,
+        const layoutEdges: Edge[] = data.edges
+          .filter((e) => e.type === "inheritance")
+          .map((e, i) => ({
+            id: `${e.source}-${e.target}-inh-${i}`,
             source: e.source,
             target: e.target,
-            type: e.type,
-            data: { type: e.type, label: e.label },
-            animated: true,
-            // To ref-only nodes (positioned right): right → left
-            // To hierarchy nodes: right → right-target (loops out and back, no crossover)
-            sourceHandle: "right",
-            targetHandle: targetIsRefOnly ? "left" : "right-target",
-          };
-        });
+            type: "inheritance",
+            data: { type: "inheritance" },
+            sourceHandle: inhSource,
+            targetHandle: inhTarget,
+          }));
 
-        // Run layout
-        const { nodes: layoutNodes, edges: layoutEdges } = computeLayout(
+        // Run layout (only uses inheritance edges for positioning)
+        const { nodes: layoutNodes } = computeLayout(
           rfNodes,
-          rfEdges,
+          layoutEdges,
           direction
         );
 
         setNodes(layoutNodes);
-        setEdges(layoutEdges);
+        setGraphData(data);
 
         // Fit view after layout
         requestAnimationFrame(() => {
@@ -220,6 +382,38 @@ function SchemaMapInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSnapshotId, centerTable, depth, showRefs, direction]);
 
+  // -----------------------------------------------------------------------
+  // Compute edges reactively from graph data + expansion state
+  // -----------------------------------------------------------------------
+  const edges = useMemo(() => {
+    if (!graphData) return [];
+
+    const includedNames = new Set(graphData.nodes.map((n) => n.name));
+    const refTargetSet = new Set(
+      graphData.nodes.filter((n) => n.isReferenceTarget).map((n) => n.name)
+    );
+
+    return buildEdgesFromGraphData(
+      graphData.edges,
+      includedNames,
+      refTargetSet,
+      expandedNodes,
+      expandedGroups,
+      columnsLoadedNodes,
+      direction
+    );
+  }, [
+    graphData,
+    expandedNodes,
+    expandedGroups,
+    columnsLoadedNodes,
+    direction,
+  ]);
+
+  // -----------------------------------------------------------------------
+  // Other handlers
+  // -----------------------------------------------------------------------
+
   const handleNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
       setSelectedTable(node.id);
@@ -236,6 +430,8 @@ function SchemaMapInner() {
       setCenterTable(tableName);
       setSelectedTable(tableName);
       setExpandedNodes(new Set());
+      setExpandedGroups(new Map());
+      setColumnsLoadedNodes(new Set());
     },
     [setSelectedTable]
   );

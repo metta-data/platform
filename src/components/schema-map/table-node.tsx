@@ -36,6 +36,8 @@ interface ColumnGroup {
   tableLabel: string;
   columns: ColumnInfo[];
   isOwn: boolean;
+  /** Whether this group contains any reference columns */
+  hasRefs: boolean;
 }
 
 interface TableNodeData {
@@ -53,6 +55,9 @@ interface TableNodeData {
   snapshotId: string;
   onToggleExpand: (nodeId: string) => void;
   onDoubleClick: (tableName: string) => void;
+  onToggleGroup: (nodeId: string, groupName: string) => void;
+  onColumnsLoaded: (nodeId: string, ownTableName: string) => void;
+  expandedGroupNames: Set<string>;
   [key: string]: unknown;
 }
 
@@ -60,7 +65,9 @@ function TableNodeComponent({ id, data }: NodeProps) {
   const d = data as unknown as TableNodeData;
   const [columnGroups, setColumnGroups] = useState<ColumnGroup[]>([]);
   const [loadingColumns, setLoadingColumns] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+  // Use lifted expandedGroupNames from parent (SchemaMap) instead of local state
+  const expandedGroupNames = d.expandedGroupNames || new Set<string>();
 
   const handleToggle = useCallback(
     (e: React.MouseEvent) => {
@@ -78,18 +85,13 @@ function TableNodeComponent({ id, data }: NodeProps) {
     [d]
   );
 
-  const toggleGroup = useCallback((tableName: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setExpandedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(tableName)) {
-        next.delete(tableName);
-      } else {
-        next.add(tableName);
-      }
-      return next;
-    });
-  }, []);
+  const toggleGroup = useCallback(
+    (tableName: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      d.onToggleGroup(id, tableName);
+    },
+    [id, d]
+  );
 
   // Fetch columns when expanded, grouped by inheritance level
   useEffect(() => {
@@ -129,17 +131,18 @@ function TableNodeComponent({ id, data }: NodeProps) {
               tableLabel: labelMap.get(tblName) || tblName,
               columns: cols,
               isOwn: tblName === d.name,
+              hasRefs: cols.some((c) => c.referenceTable != null),
             });
           }
         }
 
         setColumnGroups(groups);
-        // Auto-expand own columns
-        setExpandedGroups(new Set([d.name]));
+        // Notify parent that columns have loaded (triggers edge recomputation)
+        d.onColumnsLoaded(id, d.name);
       })
       .catch(console.error)
       .finally(() => setLoadingColumns(false));
-  }, [d.expanded, d.name, d.label, d.snapshotId, columnGroups.length]);
+  }, [d.expanded, d.name, d.label, d.snapshotId, columnGroups.length, id, d]);
 
   const borderColor = scopeColor(d.scopeName);
 
@@ -231,9 +234,9 @@ function TableNodeComponent({ id, data }: NodeProps) {
             </div>
           ) : (
             columnGroups.map((group) => {
-              const isExpanded = expandedGroups.has(group.tableName);
+              const isExpanded = expandedGroupNames.has(group.tableName);
               return (
-                <div key={group.tableName}>
+                <div key={group.tableName} className="relative">
                   {/* Group header */}
                   <button
                     onClick={(e) => toggleGroup(group.tableName, e)}
@@ -258,6 +261,16 @@ function TableNodeComponent({ id, data }: NodeProps) {
                     </span>
                   </button>
 
+                  {/* Dynamic handle on group header for reference edge pinning */}
+                  {group.hasRefs && (
+                    <Handle
+                      type="source"
+                      position={Position.Right}
+                      id={`ref-group-${group.tableName}`}
+                      className="!bg-blue-500 !w-1.5 !h-1.5 !border-0"
+                    />
+                  )}
+
                   {/* Column list */}
                   {isExpanded && (
                     <div
@@ -269,7 +282,7 @@ function TableNodeComponent({ id, data }: NodeProps) {
                         {group.columns.slice(0, 30).map((col) => (
                           <li
                             key={col.element}
-                            className="flex items-center justify-between gap-2 text-xs py-0.5 px-1 rounded hover:bg-muted/50"
+                            className="relative flex items-center justify-between gap-2 text-xs py-0.5 px-1 rounded hover:bg-muted/50"
                           >
                             <span className="truncate min-w-0">
                               {col.label || col.element}:
@@ -286,6 +299,16 @@ function TableNodeComponent({ id, data }: NodeProps) {
                                 </span>
                               )}
                             </span>
+
+                            {/* Dynamic handle on reference field row for edge pinning */}
+                            {col.referenceTable && (
+                              <Handle
+                                type="source"
+                                position={Position.Right}
+                                id={`ref-field-${col.element}`}
+                                className="!bg-blue-500 !w-1 !h-1 !border-0"
+                              />
+                            )}
                           </li>
                         ))}
                         {group.columns.length > 30 && (
