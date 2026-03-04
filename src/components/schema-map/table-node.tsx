@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
+import { memo, useState, useEffect, useMemo, useCallback } from "react";
 import { Handle, Position, useUpdateNodeInternals } from "@xyflow/react";
 import type { NodeProps } from "@xyflow/react";
 import {
@@ -70,55 +70,66 @@ function TableNodeComponent({ id, data }: NodeProps) {
   // Use lifted expandedGroupNames from parent (SchemaMap) instead of local state
   const expandedGroupNames = d.expandedGroupNames || new Set<string>();
 
-  // --- Dynamic handle positioning ---
-  // Handles must be at the node's top level so React Flow positions them at the
-  // node's right edge. We measure group-header / field-row DOM offsets and
-  // render Handle components with explicit `top` pixel values.
-  const nodeRef = useRef<HTMLDivElement>(null);
-  const [handleOffsets, setHandleOffsets] = useState<
-    { id: string; top: number }[]
-  >([]);
+  // --- Pre-computed handle positions ---
+  // Compute handle positions arithmetically from the column group structure
+  // using known CSS pixel constants. This avoids the two-render-cycle timing
+  // issues of DOM measurement (useLayoutEffect + getBoundingClientRect).
+  const HEADER_HEIGHT = 75;   // px-3 py-2, label + name + metadata row
+  const BORDER_T = 1;         // border-t on expanded section
+  const GROUP_HEADER_H = 29;  // py-1.5 + text-xs + border-b
+  const GROUP_PAD = 4;        // py-1 on expanded group container
+  const FIELD_ROW_H = 20;     // py-0.5 + text-xs
 
-  // Stable key for expandedGroupNames so we can use it as a dependency
-  const expandedGroupsKey = expandedGroupNames
-    ? [...expandedGroupNames].sort().join(",")
-    : "";
+  const handlePositions = useMemo(() => {
+    if (!d.expanded || columnGroups.length === 0) return [];
 
-  // Measure positions of [data-handle-id] elements relative to the node
-  useLayoutEffect(() => {
-    if (!d.expanded || !nodeRef.current) {
-      setHandleOffsets([]);
-      return;
+    const positions: { id: string; top: number }[] = [];
+    let offset = HEADER_HEIGHT + BORDER_T;
+
+    for (const group of columnGroups) {
+      // Group-level handle: only if group has reference columns
+      if (group.hasRefs) {
+        positions.push({
+          id: `ref-group-${group.tableName}`,
+          top: offset + GROUP_HEADER_H / 2,
+        });
+      }
+
+      offset += GROUP_HEADER_H;
+
+      // If group is expanded, compute field-level handles
+      if (expandedGroupNames.has(group.tableName)) {
+        offset += GROUP_PAD; // top padding
+
+        const visibleCols = group.columns.slice(0, 30);
+        for (const col of visibleCols) {
+          if (col.referenceTable) {
+            positions.push({
+              id: `ref-field-${col.element}`,
+              top: offset + FIELD_ROW_H / 2,
+            });
+          }
+          offset += FIELD_ROW_H;
+        }
+
+        // "+N more..." row
+        if (group.columns.length > 30) {
+          offset += FIELD_ROW_H;
+        }
+
+        offset += GROUP_PAD; // bottom padding
+      }
     }
 
-    const nodeEl = nodeRef.current;
-    const nodeRect = nodeEl.getBoundingClientRect();
-    const els = nodeEl.querySelectorAll<HTMLElement>("[data-handle-id]");
-    const offsets: { id: string; top: number }[] = [];
-    const seen = new Set<string>();
+    return positions;
+  }, [d.expanded, columnGroups, expandedGroupNames]);
 
-    els.forEach((el) => {
-      const handleId = el.getAttribute("data-handle-id");
-      if (!handleId || seen.has(handleId)) return;
-      seen.add(handleId);
-      const elRect = el.getBoundingClientRect();
-      // Center of the element, relative to the node's top edge
-      offsets.push({
-        id: handleId,
-        top: elRect.top - nodeRect.top + elRect.height / 2,
-      });
-    });
-
-    setHandleOffsets(offsets);
-
-    // Tell React Flow to re-evaluate edges after handles are rendered.
-    // The rAF ensures the Handle components from the subsequent state-driven
-    // re-render are in the DOM before React Flow recalculates.
-    requestAnimationFrame(() => {
+  // Notify React Flow when handles change so edges re-connect
+  useEffect(() => {
+    if (handlePositions.length > 0) {
       updateNodeInternals(id);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [d.expanded, columnGroups, expandedGroupsKey, id, updateNodeInternals]);
+    }
+  }, [handlePositions, id, updateNodeInternals]);
 
   // --- Handlers ---
 
@@ -201,7 +212,6 @@ function TableNodeComponent({ id, data }: NodeProps) {
 
   return (
     <div
-      ref={nodeRef}
       className={`
         bg-background rounded-lg shadow-md border-2 transition-all duration-150
         ${d.isCenter ? "ring-2 ring-primary ring-offset-2" : ""}
@@ -228,9 +238,9 @@ function TableNodeComponent({ id, data }: NodeProps) {
       <Handle type="target" position={Position.Right} id="right-target"
         className="!bg-muted-foreground !w-1.5 !h-1.5" style={{ top: '60%' }} />
 
-      {/* Dynamic handles for reference edge pinning — rendered at node level
-          with measured top offsets so they sit at the node's right edge */}
-      {handleOffsets.map(({ id: handleId, top }) => (
+      {/* Dynamic handles for reference edge pinning — pre-computed positions
+          from column group structure, rendered at node level */}
+      {handlePositions.map(({ id: handleId, top }) => (
         <Handle
           key={handleId}
           type="source"
@@ -304,13 +314,8 @@ function TableNodeComponent({ id, data }: NodeProps) {
               const isExpanded = expandedGroupNames.has(group.tableName);
               return (
                 <div key={group.tableName}>
-                  {/* Group header — data-handle-id marks it for position measurement */}
+                  {/* Group header */}
                   <button
-                    data-handle-id={
-                      group.hasRefs
-                        ? `ref-group-${group.tableName}`
-                        : undefined
-                    }
                     onClick={(e) => toggleGroup(group.tableName, e)}
                     className={`
                       w-full flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold
@@ -344,11 +349,6 @@ function TableNodeComponent({ id, data }: NodeProps) {
                         {group.columns.slice(0, 30).map((col) => (
                           <li
                             key={col.element}
-                            data-handle-id={
-                              col.referenceTable
-                                ? `ref-field-${col.element}`
-                                : undefined
-                            }
                             className="flex items-center justify-between gap-2 text-xs py-0.5 px-1 rounded hover:bg-muted/50"
                           >
                             <span className="truncate min-w-0">
