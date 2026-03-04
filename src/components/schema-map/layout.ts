@@ -121,9 +121,32 @@ export function computeLayout(
 
   dagre.layout(g);
 
+  // Build child→parent map from inheritance edges so we can walk the ancestor chain
+  const childToParent = new Map<string, string>();
+  for (const edge of edges) {
+    if (edge.data?.type === "inheritance") {
+      childToParent.set(edge.target, edge.source);
+    }
+  }
+
+  // Find center node's dagre X center
+  const centerNodeId = centerNode?.id;
+  const centerDagre = centerNodeId ? g.node(centerNodeId) : null;
+  const centerXMid = centerDagre?.x ?? 0;
+
+  // Collect ancestor IDs (walk up from center)
+  const ancestorIds = new Set<string>();
+  if (centerNodeId) {
+    let cur = childToParent.get(centerNodeId);
+    while (cur) {
+      ancestorIds.add(cur);
+      cur = childToParent.get(cur);
+    }
+  }
+
   // Apply dagre positions to hierarchy nodes, track bounding box & center table position
   let maxX = -Infinity;
-  let centerY = 0; // Y position of the center/focused table
+  let centerY = 0;
   let centerX = 0;
   let centerNodeHeight = DETAILED_NODE_HEIGHT;
 
@@ -132,14 +155,15 @@ export function computeLayout(
     if (!nodeWithPosition) return node;
 
     const { width, height } = getNodeDimensions(node);
-    const x = nodeWithPosition.x - width / 2;
+    // Align ancestors to the center node's X midpoint
+    const xMid = ancestorIds.has(node.id) ? centerXMid : nodeWithPosition.x;
+    const x = xMid - width / 2;
     const y = nodeWithPosition.y - height / 2;
 
     maxX = Math.max(maxX, x + width);
 
-    // Track the center table's position for reference column alignment
     if (node.data?.isCenter) {
-      centerY = nodeWithPosition.y; // dagre center Y
+      centerY = nodeWithPosition.y;
       centerX = nodeWithPosition.x;
       centerNodeHeight = height;
     }

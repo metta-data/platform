@@ -18,11 +18,13 @@ function InheritanceEdgeComponent({
   targetPosition,
   style,
 }: EdgeProps) {
-  const [edgePath] = getStraightPath({
+  const [edgePath] = getBezierPath({
     sourceX,
     sourceY,
     targetX,
     targetY,
+    sourcePosition,
+    targetPosition,
   });
 
   return (
