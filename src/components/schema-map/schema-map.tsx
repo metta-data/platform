@@ -314,9 +314,24 @@ function SchemaMapInner() {
     // Filter nodes based on view mode:
     // showRefs = true  → center table + reference targets only
     // showRefs = false → hierarchy only (exclude ref-only targets)
-    const visibleGraphNodes = showRefs
-      ? graphData.nodes.filter((n) => n.isCenter || n.isReferenceTarget)
-      : graphData.nodes.filter((n) => !n.isReferenceTarget);
+    // Note: some reference edges may point to tables that are also in the
+    // hierarchy (e.g. a parent table). Those nodes have isReferenceTarget=false
+    // but still need to appear in reference view.
+    let visibleGraphNodes;
+    if (showRefs) {
+      const refEdgeTargets = new Set(
+        graphData.edges
+          .filter((e) => e.type === "reference")
+          .map((e) => e.target)
+      );
+      visibleGraphNodes = graphData.nodes.filter(
+        (n) => n.isCenter || n.isReferenceTarget || refEdgeTargets.has(n.name)
+      );
+    } else {
+      visibleGraphNodes = graphData.nodes.filter(
+        (n) => !n.isReferenceTarget
+      );
+    }
 
     const rfNodes: Node[] = visibleGraphNodes.map((n) => ({
       id: n.name,
@@ -333,7 +348,7 @@ function SchemaMapInner() {
         isCenter: n.isCenter,
         isTruncated: n.isTruncated,
         isDetailed: n.isDetailed,
-        isReferenceTarget: n.isReferenceTarget,
+        isReferenceTarget: n.isReferenceTarget || (showRefs && !n.isCenter),
         ancestorOwnCounts: n.ancestorOwnCounts,
         expanded: expandedNodes.has(n.name),
         columnCount: n.ownColumnCount,
@@ -409,9 +424,13 @@ function SchemaMapInner() {
       : graphData.edges.filter((e) => e.type === "inheritance");
 
     const includedNames = new Set(graphData.nodes.map((n) => n.name));
-    const refTargetSet = new Set(
-      graphData.nodes.filter((n) => n.isReferenceTarget).map((n) => n.name)
-    );
+    // In ref view, all non-center nodes are positioned in the reference column
+    // so they all need "left" target handles
+    const refTargetSet = showRefs
+      ? new Set(graphData.nodes.filter((n) => !n.isCenter).map((n) => n.name))
+      : new Set(
+          graphData.nodes.filter((n) => n.isReferenceTarget).map((n) => n.name)
+        );
 
     return buildEdgesFromGraphData(
       visibleEdges,

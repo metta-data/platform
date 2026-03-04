@@ -169,7 +169,7 @@ export async function GET(request: Request) {
         : labelToName.get(col.referenceTable) || null;
 
       if (!refName) continue;
-      // Skip references to self or tables already in hierarchy
+      // Skip references to self
       if (refName === centerTable) continue;
 
       const existing = refsByTarget.get(refName) || [];
