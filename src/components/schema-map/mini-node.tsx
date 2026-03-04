@@ -32,30 +32,15 @@ function MiniNodeComponent({ data }: NodeProps) {
       onDoubleClick={handleDoubleClick}
       title={`${d.label} (${d.name}) — double-click to explore`}
     >
-      {/* Handles for edge connections */}
-      <Handle
-        type="target"
-        position={Position.Top}
-        className="!bg-transparent !border-0 !w-1 !h-1"
-      />
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        className="!bg-transparent !border-0 !w-1 !h-1"
-      />
-      {/* Side handles for reference edges */}
-      <Handle
-        type="target"
-        position={Position.Left}
-        id="left-target"
-        className="!bg-transparent !border-0 !w-1 !h-1"
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="right-source"
-        className="!bg-transparent !border-0 !w-1 !h-1"
-      />
+      {/* Handles — all 4 sides with IDs */}
+      <Handle type="target" position={Position.Top} id="top"
+        className="!bg-transparent !border-0 !w-1 !h-1" />
+      <Handle type="source" position={Position.Bottom} id="bottom"
+        className="!bg-transparent !border-0 !w-1 !h-1" />
+      <Handle type="target" position={Position.Left} id="left"
+        className="!bg-transparent !border-0 !w-1 !h-1" />
+      <Handle type="source" position={Position.Right} id="right"
+        className="!bg-transparent !border-0 !w-1 !h-1" />
 
       <div className="flex items-center gap-1.5">
         <span className="text-xs text-muted-foreground truncate max-w-[140px] font-medium">

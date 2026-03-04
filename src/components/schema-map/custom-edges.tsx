@@ -1,12 +1,7 @@
 "use client";
 
 import { memo } from "react";
-import {
-  BaseEdge,
-  EdgeLabelRenderer,
-  getSmoothStepPath,
-  getBezierPath,
-} from "@xyflow/react";
+import { BaseEdge, EdgeLabelRenderer, getBezierPath } from "@xyflow/react";
 import type { EdgeProps } from "@xyflow/react";
 
 function InheritanceEdgeComponent({
@@ -18,14 +13,13 @@ function InheritanceEdgeComponent({
   targetPosition,
   style,
 }: EdgeProps) {
-  const [edgePath] = getSmoothStepPath({
+  const [edgePath] = getBezierPath({
     sourceX,
     sourceY,
     targetX,
     targetY,
     sourcePosition,
     targetPosition,
-    borderRadius: 8,
   });
 
   return (

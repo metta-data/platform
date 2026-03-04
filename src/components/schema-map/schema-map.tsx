@@ -146,7 +146,14 @@ function SchemaMapInner() {
           },
         }));
 
-        // Convert to React Flow edges
+        // Convert to React Flow edges — assign handles based on layout direction
+        // Inheritance flows with the direction (TB: top→bottom, LR: left→right)
+        // Reference edges flow perpendicular to the hierarchy direction
+        const inhSource = direction === "TB" ? "bottom" : "right";
+        const inhTarget = direction === "TB" ? "top" : "left";
+        const refSource = direction === "TB" ? "right" : "bottom";
+        const refTarget = direction === "TB" ? "left" : "top";
+
         const rfEdges: Edge[] = data.edges.map((e, i) => ({
           id: `${e.source}-${e.target}-${e.type}-${i}`,
           source: e.source,
@@ -154,13 +161,8 @@ function SchemaMapInner() {
           type: e.type,
           data: { type: e.type, label: e.label },
           animated: e.type === "reference",
-          // For reference edges, use side handles
-          ...(e.type === "reference"
-            ? {
-                sourceHandle: "right-source",
-                targetHandle: "left-target",
-              }
-            : {}),
+          sourceHandle: e.type === "inheritance" ? inhSource : refSource,
+          targetHandle: e.type === "inheritance" ? inhTarget : refTarget,
         }));
 
         // Run layout

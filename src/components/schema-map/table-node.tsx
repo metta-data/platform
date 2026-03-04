@@ -158,30 +158,15 @@ function TableNodeComponent({ id, data }: NodeProps) {
       }}
       onDoubleClick={handleDoubleClick}
     >
-      {/* Handles for inheritance edges (top/bottom) */}
-      <Handle
-        type="target"
-        position={Position.Top}
-        className="!bg-muted-foreground !w-2 !h-2"
-      />
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        className="!bg-muted-foreground !w-2 !h-2"
-      />
-      {/* Side handles for reference edges */}
-      <Handle
-        type="target"
-        position={Position.Left}
-        id="left-target"
-        className="!bg-blue-500 !w-1.5 !h-1.5"
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="right-source"
-        className="!bg-blue-500 !w-1.5 !h-1.5"
-      />
+      {/* Handles — all 4 sides with IDs so edges can target specific positions */}
+      <Handle type="target" position={Position.Top} id="top"
+        className="!bg-muted-foreground !w-2 !h-2" />
+      <Handle type="source" position={Position.Bottom} id="bottom"
+        className="!bg-muted-foreground !w-2 !h-2" />
+      <Handle type="target" position={Position.Left} id="left"
+        className="!bg-muted-foreground !w-1.5 !h-1.5" />
+      <Handle type="source" position={Position.Right} id="right"
+        className="!bg-muted-foreground !w-1.5 !h-1.5" />
 
       {/* Header */}
       <div className="px-3 py-2">

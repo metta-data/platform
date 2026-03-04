@@ -121,13 +121,14 @@ export async function GET(request: Request) {
       .filter(([, dist]) => dist <= depth)
       .map(([name]) => name);
 
+    // Use referenceTable not-null as the indicator (internalType display value
+    // varies by instance — "Reference", "reference", "Glide Reference", etc.)
     const refColumns = await prisma.snapshotColumn.findMany({
       where: {
         table: {
           snapshotId,
           name: { in: detailedNames },
         },
-        internalType: "reference",
         referenceTable: { not: null },
       },
       select: {
