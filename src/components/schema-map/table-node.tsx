@@ -57,6 +57,8 @@ interface TableNodeData {
   onDoubleClick: (tableName: string) => void;
   onToggleGroup: (nodeId: string, groupName: string) => void;
   onColumnsLoaded: (nodeId: string, ownTableName: string) => void;
+  onFieldClick: (nodeId: string, fieldElement: string) => void;
+  highlightedRefField: string | null;
   expandedGroupNames: Set<string>;
   [key: string]: unknown;
 }
@@ -346,28 +348,50 @@ function TableNodeComponent({ id, data }: NodeProps) {
                       }`}
                     >
                       <ul className="space-y-0">
-                        {group.columns.slice(0, 30).map((col) => (
-                          <li
-                            key={col.element}
-                            className="flex items-center justify-between gap-2 text-xs py-0.5 px-1 rounded hover:bg-muted/50"
-                          >
-                            <span className="truncate min-w-0">
-                              {col.label || col.element}:
-                            </span>
-                            <span className="flex items-center gap-1 flex-shrink-0 text-muted-foreground">
-                              {col.referenceTable ? (
-                                <span className="text-[10px] text-blue-600 dark:text-blue-400 flex items-center gap-0.5">
-                                  reference
-                                  <ArrowUpRight className="w-2.5 h-2.5" />
-                                </span>
-                              ) : (
-                                <span className="text-[10px]">
-                                  {col.internalType}
-                                </span>
-                              )}
-                            </span>
-                          </li>
-                        ))}
+                        {group.columns.slice(0, 30).map((col) => {
+                          const isRef = col.referenceTable != null;
+                          const isHighlighted = isRef && d.highlightedRefField === col.element;
+                          return (
+                            <li
+                              key={col.element}
+                              onClick={isRef ? (e: React.MouseEvent) => {
+                                e.stopPropagation();
+                                d.onFieldClick(id, col.element);
+                              } : undefined}
+                              className={`
+                                flex items-center justify-between gap-2 text-xs py-0.5 px-1 rounded
+                                ${isRef
+                                  ? "cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                                  : "hover:bg-muted/50"
+                                }
+                                ${isHighlighted
+                                  ? "bg-blue-100 dark:bg-blue-900/40 ring-1 ring-blue-400/50"
+                                  : ""
+                                }
+                              `}
+                            >
+                              <span className="truncate min-w-0">
+                                {col.label || col.element}:
+                              </span>
+                              <span className="flex items-center gap-1 flex-shrink-0 text-muted-foreground">
+                                {isRef ? (
+                                  <span className={`text-[10px] flex items-center gap-0.5 ${
+                                    isHighlighted
+                                      ? "text-blue-700 dark:text-blue-300 font-semibold"
+                                      : "text-blue-600 dark:text-blue-400"
+                                  }`}>
+                                    reference
+                                    <ArrowUpRight className="w-2.5 h-2.5" />
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px]">
+                                    {col.internalType}
+                                  </span>
+                                )}
+                              </span>
+                            </li>
+                          );
+                        })}
                         {group.columns.length > 30 && (
                           <li className="text-[10px] text-muted-foreground py-0.5 px-1">
                             +{group.columns.length - 30} more...

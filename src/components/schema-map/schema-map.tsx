@@ -44,7 +44,8 @@ function buildEdgesFromGraphData(
   expandedNodes: Set<string>,
   expandedGroups: Map<string, Set<string>>,
   columnsLoadedNodes: Set<string>,
-  direction: "TB" | "LR"
+  direction: "TB" | "LR",
+  highlightedRefField: string | null
 ): Edge[] {
   const inhSource = direction === "TB" ? "bottom" : "right";
   const inhTarget = direction === "TB" ? "top" : "left";
@@ -79,13 +80,16 @@ function buildEdgesFromGraphData(
 
     if (!isSourceExpanded || !e.fields) {
       // Collapsed: single edge with label, generic right handle
+      // Highlight if any of the bundled fields match the selected field
+      const isHighlighted = highlightedRefField != null &&
+        (e.fields?.some((f) => f.element === highlightedRefField) ?? false);
       result.push({
         id: `${e.source}-${e.target}-ref-${edgeIdx++}`,
         source: e.source,
         target: e.target,
         type: "reference",
-        data: { type: "reference", label: e.label },
-        animated: true,
+        data: { type: "reference", label: e.label, highlighted: isHighlighted },
+        animated: isHighlighted,
         sourceHandle: "right",
         targetHandle,
       });
@@ -110,26 +114,29 @@ function buildEdgesFromGraphData(
       if (nodeGroups.has(groupTable)) {
         // Group is expanded: one edge per field, pinned to field row
         for (const field of fields) {
+          const isHighlighted = highlightedRefField === field.element;
           result.push({
             id: `${e.source}-${e.target}-ref-${field.element}`,
             source: e.source,
             target: e.target,
             type: "reference",
-            data: { type: "reference" }, // no label when expanded
-            animated: true,
+            data: { type: "reference", highlighted: isHighlighted },
+            animated: isHighlighted,
             sourceHandle: `ref-field-${field.element}`,
             targetHandle,
           });
         }
       } else {
         // Group is collapsed: one edge per group, pinned to group header
+        const isHighlighted = highlightedRefField != null &&
+          fields.some((f) => f.element === highlightedRefField);
         result.push({
           id: `${e.source}-${e.target}-ref-grp-${groupTable}`,
           source: e.source,
           target: e.target,
           type: "reference",
-          data: { type: "reference" }, // no label when expanded
-          animated: true,
+          data: { type: "reference", highlighted: isHighlighted },
+          animated: isHighlighted,
           sourceHandle: `ref-group-${groupTable}`,
           targetHandle,
         });
@@ -162,6 +169,9 @@ function SchemaMapInner() {
   const [columnsLoadedNodes, setColumnsLoadedNodes] = useState<Set<string>>(
     new Set()
   );
+  const [highlightedRefField, setHighlightedRefField] = useState<string | null>(
+    null
+  );
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -172,6 +182,7 @@ function SchemaMapInner() {
       setExpandedNodes(new Set());
       setExpandedGroups(new Map());
       setColumnsLoadedNodes(new Set());
+      setHighlightedRefField(null);
     }
   }, [selectedTable, centerTable]);
 
@@ -224,6 +235,16 @@ function SchemaMapInner() {
     []
   );
 
+  const handleFieldClick = useCallback(
+    (_nodeId: string, fieldElement: string) => {
+      // Toggle: click same field again to deselect
+      setHighlightedRefField((prev) =>
+        prev === fieldElement ? null : fieldElement
+      );
+    },
+    []
+  );
+
   const handleRecenter = useCallback(
     (tableName: string) => {
       setCenterTable(tableName);
@@ -231,6 +252,7 @@ function SchemaMapInner() {
       setExpandedNodes(new Set());
       setExpandedGroups(new Map());
       setColumnsLoadedNodes(new Set());
+      setHighlightedRefField(null);
     },
     [setSelectedTable]
   );
@@ -312,6 +334,8 @@ function SchemaMapInner() {
         onDoubleClick: handleRecenter,
         onToggleGroup: handleToggleGroup,
         onColumnsLoaded: handleColumnsLoaded,
+        onFieldClick: handleFieldClick,
+        highlightedRefField,
         expandedGroupNames:
           expandedGroups.get(n.name) || EMPTY_GROUP_NAMES,
       },
@@ -350,6 +374,8 @@ function SchemaMapInner() {
     handleRecenter,
     handleToggleGroup,
     handleColumnsLoaded,
+    handleFieldClick,
+    highlightedRefField,
   ]);
 
   // Fit view only when new graph data loads (not on expand/collapse)
@@ -380,7 +406,8 @@ function SchemaMapInner() {
       expandedNodes,
       expandedGroups,
       columnsLoadedNodes,
-      direction
+      direction,
+      highlightedRefField
     );
   }, [
     graphData,
@@ -388,6 +415,7 @@ function SchemaMapInner() {
     expandedGroups,
     columnsLoadedNodes,
     direction,
+    highlightedRefField,
   ]);
 
   // -----------------------------------------------------------------------
@@ -412,6 +440,7 @@ function SchemaMapInner() {
       setExpandedNodes(new Set());
       setExpandedGroups(new Map());
       setColumnsLoadedNodes(new Set());
+      setHighlightedRefField(null);
     },
     [setSelectedTable]
   );

@@ -60,15 +60,16 @@ function ReferenceEdgeComponent({
   });
 
   const label = data?.label as string | undefined;
+  const highlighted = data?.highlighted as boolean | undefined;
 
   return (
     <>
       <BaseEdge
         path={edgePath}
         style={{
-          stroke: "#3b82f6",
-          strokeWidth: 1.5,
-          strokeDasharray: "6 3",
+          stroke: highlighted ? "#3b82f6" : "#93c5fd",
+          strokeWidth: highlighted ? 2 : 1.5,
+          ...(highlighted ? { strokeDasharray: "6 3" } : {}),
           ...style,
         }}
         markerEnd="url(#reference-arrow)"
