@@ -7,7 +7,7 @@ const MINI_NODE_WIDTH = 140;
 const MINI_NODE_HEIGHT = 36;
 
 const REF_COL_GAP = 12; // vertical gap between reference target nodes
-const REF_OFFSET = 100; // horizontal gap between hierarchy and reference column
+const REF_OFFSET = 220; // horizontal gap between hierarchy and reference column (room for labels)
 
 function getNodeDimensions(node: Node) {
   const isMini = node.type === "miniNode";

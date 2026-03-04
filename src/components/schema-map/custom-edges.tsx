@@ -44,6 +44,11 @@ function ReferenceEdgeComponent({
   style,
   data,
 }: EdgeProps) {
+  // When both handles are on the same side (loop-back to hierarchy node),
+  // use a wider arc so the curve doesn't overlap the nodes
+  const sameDirection = sourcePosition === targetPosition;
+  const curvature = sameDirection ? 0.6 : 0.25;
+
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
@@ -51,6 +56,7 @@ function ReferenceEdgeComponent({
     targetY,
     sourcePosition,
     targetPosition,
+    curvature,
   });
 
   const label = data?.label as string | undefined;
