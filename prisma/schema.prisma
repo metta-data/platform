@@ -143,14 +143,28 @@ model SnapshotColumn {
 }
 
 // ============================================
-// Admin User
+// Users & Roles
 // ============================================
 
-model AdminUser {
-  id             String   @id @default(cuid())
-  email          String   @unique
-  hashedPassword String   @map("hashed_password")
-  createdAt      DateTime @default(now()) @map("created_at")
+enum UserRole {
+  PENDING
+  VIEWER
+  STEWARD
+  ADMIN
+}
 
-  @@map("admin_users")
+model User {
+  id            String   @id @default(cuid())
+  githubId      String   @unique @map("github_id")
+  username      String
+  displayName   String?  @map("display_name")
+  avatarUrl     String?  @map("avatar_url")
+  role          UserRole @default(PENDING)
+  approvedById  String?  @map("approved_by_id")
+  approvedBy    User?    @relation("ApprovedByAdmin", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedUsers User[]   @relation("ApprovedByAdmin")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
 }

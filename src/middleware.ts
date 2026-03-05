@@ -55,5 +55,6 @@ export const config = {
     "/api/upload/:path*",
     "/api/debug/:path*",
     "/api/snapshots/all",
+    "/api/admin/:path*",
   ],
 };

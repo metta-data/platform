@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { parseAndIngestJson, parseCsvUpload } from "@/lib/upload/parser";
-import { requireAdmin } from "@/lib/auth";
+import { requireApproved } from "@/lib/auth";
 
 export async function POST(request: Request) {
-  if (!(await requireAdmin())) {
+  if (!(await requireApproved())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const formData = await request.formData();

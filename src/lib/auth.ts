@@ -7,28 +7,86 @@ if (process.env.RAILWAY_PUBLIC_DOMAIN && !process.env.AUTH_URL) {
 import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
 
+// NOTE: prisma is imported dynamically inside callbacks to avoid bundling
+// Node.js-only Prisma client into the Edge Runtime middleware bundle.
+
 const authEnabled = !!(
   process.env.AUTH_SECRET &&
   process.env.AUTH_GITHUB_ID &&
   process.env.AUTH_GITHUB_SECRET
 );
 
+async function getPrisma() {
+  const { prisma } = await import("@/lib/db");
+  return prisma;
+}
+
 const result = authEnabled
   ? NextAuth({
       providers: [GitHub],
       session: { strategy: "jwt" },
       callbacks: {
-        jwt({ token, profile }) {
+        async signIn({ profile }) {
+          if (!profile?.id) return false;
+
+          const prisma = await getPrisma();
+          const githubId = String(profile.id);
+          const ghProfile = profile as Record<string, unknown>;
+          const isBootstrapAdmin =
+            githubId === process.env.ADMIN_GITHUB_ID;
+
+          await prisma.user.upsert({
+            where: { githubId },
+            update: {
+              username:
+                (ghProfile.login as string) || profile.name || "unknown",
+              displayName: profile.name || null,
+              avatarUrl:
+                (ghProfile.avatar_url as string) ||
+                (profile.image as string) ||
+                null,
+            },
+            create: {
+              githubId,
+              username:
+                (ghProfile.login as string) || profile.name || "unknown",
+              displayName: profile.name || null,
+              avatarUrl:
+                (ghProfile.avatar_url as string) ||
+                (profile.image as string) ||
+                null,
+              role: isBootstrapAdmin ? "ADMIN" : "PENDING",
+            },
+          });
+
+          return true;
+        },
+
+        async jwt({ token, profile }) {
           if (profile) {
             token.githubId = String(profile.id);
           }
+
+          // Always read role from DB so admin changes take effect immediately
+          if (token.githubId) {
+            const prisma = await getPrisma();
+            const user = await prisma.user.findUnique({
+              where: { githubId: token.githubId as string },
+              select: { id: true, role: true },
+            });
+            token.userId = user?.id;
+            token.role = user?.role || "PENDING";
+          }
+
           return token;
         },
+
         session({ session, token }) {
           if (token.githubId) {
             session.user.githubId = token.githubId as string;
-            session.user.isAdmin =
-              token.githubId === process.env.ADMIN_GITHUB_ID;
+            session.user.userId = token.userId as string;
+            session.user.role = token.role as string;
+            session.user.isAdmin = token.role === "ADMIN";
           }
           return session;
         },
@@ -51,5 +109,14 @@ export async function requireAdmin() {
   if (!authEnabled) return true;
   const session = await auth();
   if (!session?.user?.isAdmin) return null;
+  return session;
+}
+
+/** Require an approved user (VIEWER, STEWARD, or ADMIN).
+ *  When auth is not configured, allows all requests through. */
+export async function requireApproved() {
+  if (!authEnabled) return true;
+  const session = await auth();
+  if (!session?.user?.role || session.user.role === "PENDING") return null;
   return session;
 }

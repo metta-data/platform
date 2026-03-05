@@ -73,6 +73,11 @@ function AuthControls() {
               <DropdownMenuItem disabled className="text-xs text-muted-foreground">
                 {session.user.name || session.user.email}
               </DropdownMenuItem>
+              {session.user.role && (
+                <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                  Role: {session.user.role}
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => signOut()}>
                 Sign out
               </DropdownMenuItem>
