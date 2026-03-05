@@ -335,7 +335,7 @@ function SchemaMapInner() {
 
     const rfNodes: Node[] = visibleGraphNodes.map((n) => ({
       id: n.name,
-      type: n.isDetailed ? "tableNode" : "miniNode",
+      type: n.isDetailed && !(showRefs && !n.isCenter) ? "tableNode" : "miniNode",
       position: { x: 0, y: 0 },
       data: {
         label: n.label,
