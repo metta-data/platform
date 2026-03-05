@@ -11,7 +11,7 @@ import {
 
 const DETAILED_NODE_WIDTH = 240;
 const DETAILED_NODE_HEIGHT = 80;
-const MINI_NODE_WIDTH = 140;
+const MINI_NODE_WIDTH = 160;
 const MINI_NODE_HEIGHT = 36;
 
 const REF_COL_GAP = 12; // vertical gap between reference target nodes

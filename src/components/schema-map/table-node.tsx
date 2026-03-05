@@ -224,8 +224,7 @@ function TableNodeComponent({ id, data }: NodeProps) {
       style={{
         borderLeftWidth: 4,
         borderLeftColor: borderColor,
-        minWidth: 240,
-        maxWidth: 320,
+        width: 240,
       }}
       onDoubleClick={handleDoubleClick}
     >

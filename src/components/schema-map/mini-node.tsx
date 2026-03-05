@@ -28,7 +28,7 @@ function MiniNodeComponent({ data }: NodeProps) {
   return (
     <div
       className="bg-muted/80 rounded-md border border-border/60 px-3 py-1.5 cursor-pointer hover:bg-muted hover:border-border transition-colors"
-      style={{ minWidth: 120 }}
+      style={{ width: 160 }}
       onDoubleClick={handleDoubleClick}
       title={`${d.label} (${d.name}) — double-click to explore`}
     >
