@@ -62,20 +62,36 @@ const result = authEnabled
           return true;
         },
 
-        async jwt({ token, profile }) {
+        async jwt({ token, profile, trigger }) {
+          // On sign-in, read role from DB (runs in Node.js runtime)
           if (profile) {
             token.githubId = String(profile.id);
+            try {
+              const prisma = await getPrisma();
+              const user = await prisma.user.findUnique({
+                where: { githubId: String(profile.id) },
+                select: { id: true, role: true },
+              });
+              token.userId = user?.id;
+              token.role = user?.role || "PENDING";
+            } catch {
+              // DB not available (e.g., Edge Runtime) — keep existing token data
+            }
           }
 
-          // Always read role from DB so admin changes take effect immediately
-          if (token.githubId) {
-            const prisma = await getPrisma();
-            const user = await prisma.user.findUnique({
-              where: { githubId: token.githubId as string },
-              select: { id: true, role: true },
-            });
-            token.userId = user?.id;
-            token.role = user?.role || "PENDING";
+          // On manual session update, refresh role from DB
+          if (trigger === "update" && token.githubId) {
+            try {
+              const prisma = await getPrisma();
+              const user = await prisma.user.findUnique({
+                where: { githubId: token.githubId as string },
+                select: { id: true, role: true },
+              });
+              token.userId = user?.id;
+              token.role = user?.role || "PENDING";
+            } catch {
+              // DB not available — keep existing token data
+            }
           }
 
           return token;
