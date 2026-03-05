@@ -17,10 +17,19 @@ interface UserSummary {
   role: string;
 }
 
+interface CatalogStats {
+  totalEntries: number;
+  definedCount: number;
+  undefinedCount: number;
+  stewardedCount: number;
+  tableCount: number;
+}
+
 export default function AdminPage() {
   const [snapshots, setSnapshots] = useState<SnapshotSummary[]>([]);
   const [instances, setInstances] = useState<{ id: string; name: string; url: string }[]>([]);
   const [users, setUsers] = useState<UserSummary[]>([]);
+  const [catalogStats, setCatalogStats] = useState<CatalogStats | null>(null);
 
   useEffect(() => {
     fetch("/api/snapshots")
@@ -35,13 +44,17 @@ export default function AdminPage() {
       .then((r) => r.json())
       .then((data: UserSummary[]) => setUsers(data))
       .catch(console.error);
+    fetch("/api/catalog/stats")
+      .then((r) => r.json())
+      .then(setCatalogStats)
+      .catch(console.error);
   }, []);
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold mb-6">Admin Dashboard</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
         <Card>
           <CardHeader>
             <CardTitle className="text-3xl">{snapshots.length}</CardTitle>
@@ -73,6 +86,19 @@ export default function AdminPage() {
               )}
             </CardTitle>
             <CardDescription>Users</CardDescription>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-3xl flex items-baseline gap-2">
+              {catalogStats?.totalEntries ?? 0}
+              {catalogStats && catalogStats.undefinedCount > 0 && (
+                <span className="text-sm font-normal text-amber-600">
+                  ({catalogStats.undefinedCount} undefined)
+                </span>
+              )}
+            </CardTitle>
+            <CardDescription>Catalog Entries</CardDescription>
           </CardHeader>
         </Card>
       </div>
@@ -116,6 +142,20 @@ export default function AdminPage() {
           <CardContent>
             <Button asChild>
               <Link href="/admin/users">Manage Users</Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Data Catalog</CardTitle>
+            <CardDescription>
+              Generate and manage field definitions
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild>
+              <Link href="/admin/catalog">Manage Catalog</Link>
             </Button>
           </CardContent>
         </Card>

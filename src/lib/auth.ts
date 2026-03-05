@@ -136,3 +136,13 @@ export async function requireApproved() {
   if (!session?.user?.role || session.user.role === "PENDING") return null;
   return session;
 }
+
+/** Require a steward or admin (STEWARD or ADMIN).
+ *  When auth is not configured, allows all requests through. */
+export async function requireStewardOrAdmin() {
+  if (!authEnabled) return true;
+  const session = await auth();
+  if (!session?.user?.role) return null;
+  if (!["STEWARD", "ADMIN"].includes(session.user.role)) return null;
+  return session;
+}

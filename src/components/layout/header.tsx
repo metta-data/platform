@@ -18,6 +18,7 @@ const authEnabled = process.env.NEXT_PUBLIC_AUTH_ENABLED === "true";
 const publicNavItems = [
   { href: "/explorer", label: "Explorer" },
   { href: "/compare", label: "Compare" },
+  { href: "/catalog", label: "Catalog" },
 ];
 
 /** Only rendered when auth is enabled (inside SessionProvider) */

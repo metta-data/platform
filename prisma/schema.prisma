@@ -47,7 +47,9 @@ model SchemaSnapshot {
   createdAt         DateTime           @default(now()) @map("created_at")
   updatedAt         DateTime           @updatedAt @map("updated_at")
 
-  tables            SnapshotTable[]
+  tables                 SnapshotTable[]
+  catalogSource          CatalogEntry[]          @relation("CatalogSource")
+  catalogEntrySnapshots  CatalogEntrySnapshot[]
 
   @@index([label])
   @@index([isBaseline])
@@ -154,17 +156,59 @@ enum UserRole {
 }
 
 model User {
-  id            String   @id @default(cuid())
-  githubId      String   @unique @map("github_id")
-  username      String
-  displayName   String?  @map("display_name")
-  avatarUrl     String?  @map("avatar_url")
-  role          UserRole @default(PENDING)
-  approvedById  String?  @map("approved_by_id")
-  approvedBy    User?    @relation("ApprovedByAdmin", fields: [approvedById], references: [id], onDelete: SetNull)
-  approvedUsers User[]   @relation("ApprovedByAdmin")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id             String         @id @default(cuid())
+  githubId       String         @unique @map("github_id")
+  username       String
+  displayName    String?        @map("display_name")
+  avatarUrl      String?        @map("avatar_url")
+  role           UserRole       @default(PENDING)
+  approvedById   String?        @map("approved_by_id")
+  approvedBy     User?          @relation("ApprovedByAdmin", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedUsers  User[]         @relation("ApprovedByAdmin")
+  catalogEntries CatalogEntry[]
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
 
   @@map("users")
+}
+
+// ============================================
+// Data Catalog
+// ============================================
+
+model CatalogEntry {
+  id               String                 @id @default(cuid())
+  tableName        String                 @map("table_name")
+  element          String
+  label            String
+  internalType     String                 @map("internal_type")
+  definition       String?
+  stewardId        String?                @map("steward_id")
+  steward          User?                  @relation(fields: [stewardId], references: [id], onDelete: SetNull)
+  sourceSnapshotId String                 @map("source_snapshot_id")
+  sourceSnapshot   SchemaSnapshot         @relation("CatalogSource", fields: [sourceSnapshotId], references: [id])
+  snapshots        CatalogEntrySnapshot[]
+  createdAt        DateTime               @default(now()) @map("created_at")
+  updatedAt        DateTime               @updatedAt @map("updated_at")
+
+  @@unique([tableName, element])
+  @@index([tableName])
+  @@index([element])
+  @@index([stewardId])
+  @@index([sourceSnapshotId])
+  @@map("catalog_entries")
+}
+
+model CatalogEntrySnapshot {
+  id             String         @id @default(cuid())
+  catalogEntryId String         @map("catalog_entry_id")
+  catalogEntry   CatalogEntry   @relation(fields: [catalogEntryId], references: [id], onDelete: Cascade)
+  snapshotId     String         @map("snapshot_id")
+  snapshot       SchemaSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  linkedAt       DateTime       @default(now()) @map("linked_at")
+
+  @@unique([catalogEntryId, snapshotId])
+  @@index([catalogEntryId])
+  @@index([snapshotId])
+  @@map("catalog_entry_snapshots")
 }
