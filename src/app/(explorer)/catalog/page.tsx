@@ -344,7 +344,7 @@ export default function CatalogPage() {
     }
   };
 
-  // Bulk assign steward
+  // Bulk assign steward (selected entries)
   const handleBulkAssignSteward = async () => {
     if (bulkSelected.size === 0 || !currentUserId) return;
     setBulkAssigning(true);
@@ -362,6 +362,43 @@ export default function CatalogPage() {
       fetchEntries();
       refreshStats();
       setBulkSelected(new Set());
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setBulkAssigning(false);
+    }
+  };
+
+  // Bulk assign steward to ALL entries matching current filters
+  const handleAssignStewardAll = async () => {
+    if (!currentUserId) return;
+    const count = pagination?.total || 0;
+    if (!confirm(`Assign yourself as steward to all ${count.toLocaleString()} matching entries?`)) return;
+    setBulkAssigning(true);
+    try {
+      const filters: Record<string, string> = {};
+      if (search) filters.search = search;
+      if (tableFilter) filters.table = tableFilter;
+      if (typeFilter) filters.type = typeFilter;
+      if (definedFilter) filters.defined = definedFilter;
+      if (validatedFilter) filters.validated = validatedFilter;
+      if (sourceFilter) filters.source = sourceFilter;
+
+      const res = await fetch("/api/catalog/steward", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          filters,
+          stewardId: currentUserId,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to assign steward");
+      const data = await res.json();
+
+      fetchEntries();
+      refreshStats();
+      setBulkSelected(new Set());
+      console.log(`${data.updated} entries assigned`);
     } catch (err) {
       console.error(err);
     } finally {
@@ -624,6 +661,23 @@ export default function CatalogPage() {
             onClick={() => setBulkSelected(new Set())}
           >
             Clear selection
+          </Button>
+        </div>
+      )}
+
+      {/* Bulk assign steward to all matching */}
+      {canEdit && currentUserId && pagination && pagination.total > 0 && (
+        <div className="flex items-center gap-3 mb-4 p-3 rounded-lg border bg-muted/50">
+          <span className="text-sm text-muted-foreground">
+            {pagination.total.toLocaleString()} entries match current filters
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={bulkAssigning}
+            onClick={handleAssignStewardAll}
+          >
+            {bulkAssigning ? "Assigning..." : "Assign me as steward to all"}
           </Button>
         </div>
       )}
