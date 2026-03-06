@@ -88,10 +88,74 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const result = await prisma.catalogEntry.updateMany({
-    where,
-    data: { stewardId: stewardId || null },
-  });
+  const userId =
+    typeof session === "object" && "user" in session
+      ? session.user?.userId
+      : undefined;
 
-  return NextResponse.json({ updated: result.count });
+  // Resolve steward names for audit trail
+  const [oldStewards, newSteward] = await Promise.all([
+    // We only need old steward names for entries that are actually changing
+    prisma.catalogEntry.findMany({
+      where,
+      select: {
+        id: true,
+        stewardId: true,
+        steward: { select: { username: true, displayName: true } },
+      },
+    }),
+    stewardId
+      ? prisma.user.findUnique({
+          where: { id: stewardId },
+          select: { username: true, displayName: true },
+        })
+      : null,
+  ]);
+
+  const newStewardName = newSteward
+    ? newSteward.displayName || newSteward.username
+    : null;
+
+  // Filter to only entries that are actually changing
+  const changing = oldStewards.filter((e) => e.stewardId !== stewardId);
+
+  if (changing.length === 0) {
+    return NextResponse.json({ updated: 0 });
+  }
+
+  // Update steward and create audit records in batches
+  const BATCH_SIZE = 500;
+  let updated = 0;
+
+  for (let i = 0; i < changing.length; i += BATCH_SIZE) {
+    const batch = changing.slice(i, i + BATCH_SIZE);
+    const batchIds = batch.map((e) => e.id);
+
+    await prisma.$transaction(
+      async (tx) => {
+        await tx.catalogEntry.updateMany({
+          where: { id: { in: batchIds } },
+          data: { stewardId: stewardId || null },
+        });
+
+        await tx.catalogFieldAudit.createMany({
+          data: batch.map((entry) => ({
+            catalogEntryId: entry.id,
+            fieldName: "steward",
+            oldValue: entry.steward
+              ? entry.steward.displayName || entry.steward.username
+              : null,
+            newValue: newStewardName,
+            comment: null,
+            userId: userId || null,
+          })),
+        });
+      },
+      { timeout: 30000 }
+    );
+
+    updated += batch.length;
+  }
+
+  return NextResponse.json({ updated });
 }

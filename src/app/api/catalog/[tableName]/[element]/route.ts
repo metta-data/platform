@@ -141,6 +141,9 @@ export async function PATCH(
         element: decodedElement,
       },
     },
+    include: {
+      steward: { select: { username: true, displayName: true } },
+    },
   });
 
   if (!entry) {
@@ -179,8 +182,36 @@ export async function PATCH(
     });
   }
 
-  if (stewardId !== undefined) {
+  if (stewardId !== undefined && stewardId !== entry.stewardId) {
     updateData.stewardId = stewardId || null;
+
+    // Resolve new steward name for audit
+    const newSteward = stewardId
+      ? await prisma.user.findUnique({
+          where: { id: stewardId },
+          select: { username: true, displayName: true },
+        })
+      : null;
+
+    const userId =
+      typeof session === "object" && "user" in session
+        ? session.user?.userId
+        : undefined;
+
+    await prisma.catalogFieldAudit.create({
+      data: {
+        catalogEntryId: entry.id,
+        fieldName: "steward",
+        oldValue: entry.steward
+          ? entry.steward.displayName || entry.steward.username
+          : null,
+        newValue: newSteward
+          ? newSteward.displayName || newSteward.username
+          : null,
+        comment: body.comment || null,
+        userId: userId || null,
+      },
+    });
   }
 
   // Allow explicit validation status override (e.g., single-entry validate)
