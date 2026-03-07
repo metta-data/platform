@@ -43,6 +43,7 @@ export const FIELD_LABELS: Record<string, string> = {
   stewardId: "steward",
   label: "label",
   internalType: "type",
+  tags: "tags",
 };
 
 /**

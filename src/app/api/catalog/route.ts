@@ -70,12 +70,28 @@ export async function GET(request: Request) {
     where.definitionSource = source as Prisma.EnumDefinitionSourceNullableFilter["equals"];
   }
 
+  // Tag filter: comma-separated tag IDs (entries must have ALL specified tags)
+  const tags = searchParams.get("tags");
+  if (tags) {
+    const tagIds = tags.split(",").filter(Boolean);
+    if (tagIds.length > 0) {
+      where.tags = {
+        some: { tagId: { in: tagIds } },
+      };
+    }
+  }
+
   const [entries, total] = await Promise.all([
     prisma.catalogEntry.findMany({
       where,
       include: {
         steward: {
           select: { id: true, username: true, displayName: true },
+        },
+        tags: {
+          include: {
+            tag: { select: { id: true, name: true, color: true, tagType: true } },
+          },
         },
       },
       orderBy: [{ tableName: "asc" }, { element: "asc" }],

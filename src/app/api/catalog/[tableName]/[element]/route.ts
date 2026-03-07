@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireStewardOrAdmin } from "@/lib/auth";
 import { auditFieldChanges } from "@/lib/catalog/audit";
+import { syncAutoTags } from "@/lib/catalog/auto-tags";
 
 export async function GET(
   _request: Request,
@@ -35,6 +36,11 @@ export async function GET(
           },
         },
         orderBy: { linkedAt: "asc" },
+      },
+      tags: {
+        include: {
+          tag: { select: { id: true, name: true, color: true, tagType: true } },
+        },
       },
     },
   });
@@ -105,6 +111,7 @@ export async function GET(
       validatedAt: entry.validatedAt,
       validatedBy: entry.validatedBy,
       steward: entry.steward,
+      tags: entry.tags.map((t) => t.tag),
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
     },
@@ -134,7 +141,7 @@ export async function PATCH(
   const decodedElement = decodeURIComponent(element);
 
   const body = await request.json();
-  const { definition, stewardId, validationStatus, definitionSource, definitionSourceDetail, citationUrl } = body;
+  const { definition, stewardId, validationStatus, definitionSource, definitionSourceDetail, citationUrl, aiConfidence } = body;
 
   const entry = await prisma.catalogEntry.findUnique({
     where: {
@@ -231,8 +238,25 @@ export async function PATCH(
       validatedBy: {
         select: { id: true, username: true, displayName: true },
       },
+      tags: {
+        include: {
+          tag: { select: { id: true, name: true, color: true, tagType: true } },
+        },
+      },
     },
   });
 
-  return NextResponse.json(updated);
+  // Sync auto-tags when definition changes
+  if (definition !== undefined) {
+    await syncAutoTags(
+      entry.id,
+      updateData.definitionSource || null,
+      aiConfidence || null
+    );
+  }
+
+  return NextResponse.json({
+    ...updated,
+    tags: updated.tags.map((t) => t.tag),
+  });
 }

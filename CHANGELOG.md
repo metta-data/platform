@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Citation panel displays extracted evidence snippets with links to source documentation
 - Graceful degradation: falls back to general knowledge when no docs evidence is found
 - In-memory caching of docs pages with 24-hour TTL for efficient repeat requests
+- Catalog entry tagging system with colored tag badges
+- Auto-tags for definition source (Source: Manual, Source: AI, etc.) and AI confidence (Cited, Partial, Uncited)
+- Auto-tags are synced automatically when definitions are saved
+- Tag filter in the catalog list view
+- Tag management admin page at `/admin/tags` with create, edit, delete, and color picker
+- Tag selector popover for manually assigning/removing tags on catalog entries
+- Tags displayed in catalog list rows and detail sheet
 
 ## [0.4.1] - 2026-03-07
 

@@ -30,6 +30,15 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TYPE_COLORS } from "@/lib/constants";
+import { TagBadge, TagOverflow } from "@/components/catalog/tag-badge";
+import { TagSelector } from "@/components/catalog/tag-selector";
+
+interface TagInfo {
+  id: string;
+  name: string;
+  color: string;
+  tagType: "AUTO" | "USER";
+}
 
 interface CatalogEntrySummary {
   id: string;
@@ -41,12 +50,13 @@ interface CatalogEntrySummary {
   definitionSource: string | null;
   validationStatus: string;
   steward: { id: string; username: string; displayName: string | null } | null;
+  tags?: { tag: TagInfo }[];
   createdAt: string;
   updatedAt: string;
 }
 
 interface CatalogEntryDetail {
-  entry: CatalogEntrySummary & {
+  entry: Omit<CatalogEntrySummary, "tags"> & {
     definitionSourceDetail: string | null;
     citationUrl: string | null;
     validatedAt: string | null;
@@ -55,6 +65,7 @@ interface CatalogEntryDetail {
       username: string;
       displayName: string | null;
     } | null;
+    tags: TagInfo[];
   };
   sourceSnapshot: { id: string; label: string; createdAt: string };
   linkedSnapshots: {
@@ -112,6 +123,7 @@ export default function CatalogPage() {
   const [definedFilter, setDefinedFilter] = useState<string>("");
   const [validatedFilter, setValidatedFilter] = useState<string>("");
   const [sourceFilter, setSourceFilter] = useState<string>("");
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [page, setPage] = useState(1);
 
   // Detail sheet
@@ -149,9 +161,10 @@ export default function CatalogPage() {
   const [bulkValidating, setBulkValidating] = useState(false);
   const [bulkAssigning, setBulkAssigning] = useState(false);
 
-  // Distinct table names and types for filter dropdowns
+  // Distinct table names, types, and tags for filter dropdowns
   const [tableNames, setTableNames] = useState<string[]>([]);
   const [fieldTypes, setFieldTypes] = useState<string[]>([]);
+  const [allTags, setAllTags] = useState<TagInfo[]>([]);
 
   // Fetch user session to determine edit permissions
   const [canEdit, setCanEdit] = useState(false);
@@ -186,6 +199,16 @@ export default function CatalogPage() {
     refreshStats();
   }, [refreshStats]);
 
+  // Fetch all tags for filter dropdown
+  useEffect(() => {
+    fetch("/api/tags")
+      .then((r) => r.json())
+      .then((tags) => {
+        if (Array.isArray(tags)) setAllTags(tags);
+      })
+      .catch(() => {});
+  }, []);
+
   // Fetch entries
   const fetchEntries = useCallback(() => {
     setLoading(true);
@@ -196,6 +219,7 @@ export default function CatalogPage() {
     if (definedFilter) params.set("defined", definedFilter);
     if (validatedFilter) params.set("validated", validatedFilter);
     if (sourceFilter) params.set("source", sourceFilter);
+    if (tagFilter.length > 0) params.set("tags", tagFilter.join(","));
     params.set("page", String(page));
     params.set("limit", "50");
 
@@ -207,7 +231,7 @@ export default function CatalogPage() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [search, tableFilter, typeFilter, definedFilter, validatedFilter, sourceFilter, page]);
+  }, [search, tableFilter, typeFilter, definedFilter, validatedFilter, sourceFilter, tagFilter, page]);
 
   useEffect(() => {
     fetchEntries();
@@ -263,6 +287,7 @@ export default function CatalogPage() {
             : "uncited";
         payload.definitionSourceDetail = `AI: ${aiDraftMeta.model} (${confidenceLabel})`;
         payload.citationUrl = aiDraftMeta.docsUrl;
+        payload.aiConfidence = aiDraftMeta.confidence;
       }
 
       const res = await fetch(
@@ -276,22 +301,12 @@ export default function CatalogPage() {
       if (!res.ok) throw new Error("Failed to save");
       const updated = await res.json();
 
-      // Update local state
-      setDetail((prev) =>
-        prev
-          ? {
-              ...prev,
-              entry: {
-                ...prev.entry,
-                definition: updated.definition,
-                definitionSource: updated.definitionSource,
-                definitionSourceDetail: updated.definitionSourceDetail,
-                citationUrl: updated.citationUrl,
-                validationStatus: updated.validationStatus,
-              },
-            }
-          : prev
+      // Refresh full detail to get updated tags from auto-tagging
+      const detailRes = await fetch(
+        `/api/catalog/${encodeURIComponent(selectedEntry.tableName)}/${encodeURIComponent(selectedEntry.element)}`
       );
+      const freshDetail = await detailRes.json();
+      setDetail(freshDetail);
       setEntries((prev) =>
         prev.map((e) =>
           e.id === selectedEntry.id
@@ -701,6 +716,43 @@ export default function CatalogPage() {
             <SelectItem value="AI_GENERATED">AI generated</SelectItem>
           </SelectContent>
         </Select>
+        {allTags.length > 0 && (
+          <Select
+            value={tagFilter.length === 1 ? tagFilter[0] : tagFilter.length > 1 ? "__multi__" : ""}
+            onValueChange={(v) => {
+              if (v === "__all__") {
+                setTagFilter([]);
+              } else if (v !== "__multi__") {
+                setTagFilter([v]);
+              }
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="All tags">
+                {tagFilter.length === 0
+                  ? "All tags"
+                  : tagFilter.length === 1
+                    ? allTags.find((t) => t.id === tagFilter[0])?.name || "Tag"
+                    : `${tagFilter.length} tags`}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All tags</SelectItem>
+              {allTags.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  <span className="flex items-center gap-2">
+                    <span
+                      className="inline-block h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: t.color }}
+                    />
+                    {t.name}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Bulk action bar */}
@@ -802,6 +854,7 @@ export default function CatalogPage() {
                   <TableHead className="w-[120px]">Type</TableHead>
                   <TableHead>Definition</TableHead>
                   <TableHead className="w-[80px]">Status</TableHead>
+                  <TableHead>Tags</TableHead>
                   <TableHead>Steward</TableHead>
                 </TableRow>
               </TableHeader>
@@ -849,6 +902,18 @@ export default function CatalogPage() {
                         sourceLabel(entry.definitionSource)}
                     </TableCell>
                     <TableCell>{validationBadge(entry)}</TableCell>
+                    <TableCell>
+                      {entry.tags && entry.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {entry.tags.slice(0, 3).map((t) => (
+                            <TagBadge key={t.tag.id} name={t.tag.name} color={t.tag.color} />
+                          ))}
+                          {entry.tags.length > 3 && (
+                            <TagOverflow count={entry.tags.length - 3} />
+                          )}
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell className="text-sm">
                       {entry.steward?.displayName ||
                         entry.steward?.username ||
@@ -917,12 +982,12 @@ export default function CatalogPage() {
               </SheetHeader>
 
               {detailLoading ? (
-                <div className="space-y-4 mt-6">
+                <div className="space-y-4 px-4 mt-2">
                   <Skeleton className="h-20 w-full" />
                   <Skeleton className="h-20 w-full" />
                 </div>
               ) : detail ? (
-                <Tabs defaultValue="definition" className="mt-6">
+                <Tabs defaultValue="definition" className="px-4 pb-6">
                   <TabsList className="w-full">
                     <TabsTrigger value="definition" className="flex-1">
                       Definition
@@ -1156,6 +1221,79 @@ export default function CatalogPage() {
                         </p>
                       </div>
                     )}
+
+                    {/* Tags */}
+                    <div>
+                      <span className="text-sm font-medium">Tags</span>
+                      <div className="mt-1">
+                        {canEdit ? (
+                          <TagSelector
+                            assignedTags={detail.entry.tags || []}
+                            onTagUpdated={(updatedTag) => {
+                              setDetail((prev) => {
+                                if (!prev) return prev;
+                                return {
+                                  ...prev,
+                                  entry: {
+                                    ...prev.entry,
+                                    tags: prev.entry.tags.map((t) =>
+                                      t.id === updatedTag.id
+                                        ? { ...t, name: updatedTag.name, color: updatedTag.color }
+                                        : t
+                                    ),
+                                  },
+                                };
+                              });
+                              fetchEntries();
+                            }}
+                            onAdd={async (tagIds) => {
+                              await fetch("/api/catalog/tags", {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  entryIds: [detail.entry.id],
+                                  addTagIds: tagIds,
+                                }),
+                              });
+                              // Refresh detail
+                              const res = await fetch(
+                                `/api/catalog/${encodeURIComponent(detail.entry.tableName)}/${encodeURIComponent(detail.entry.element)}`
+                              );
+                              const fresh = await res.json();
+                              setDetail(fresh);
+                              fetchEntries();
+                            }}
+                            onRemove={async (tagId) => {
+                              await fetch("/api/catalog/tags", {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  entryIds: [detail.entry.id],
+                                  removeTagIds: [tagId],
+                                }),
+                              });
+                              // Refresh detail
+                              const res = await fetch(
+                                `/api/catalog/${encodeURIComponent(detail.entry.tableName)}/${encodeURIComponent(detail.entry.element)}`
+                              );
+                              const fresh = await res.json();
+                              setDetail(fresh);
+                              fetchEntries();
+                            }}
+                          />
+                        ) : detail.entry.tags && detail.entry.tags.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {detail.entry.tags.map((tag) => (
+                              <TagBadge key={tag.id} name={tag.name} color={tag.color} />
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground italic">
+                            No tags assigned
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   </TabsContent>
 
                   <TabsContent value="inheritance" className="space-y-3">

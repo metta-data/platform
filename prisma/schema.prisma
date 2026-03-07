@@ -233,6 +233,7 @@ model CatalogEntry {
   sourceSnapshot         SchemaSnapshot         @relation("CatalogSource", fields: [sourceSnapshotId], references: [id])
   snapshots              CatalogEntrySnapshot[]
   fieldAudits            CatalogFieldAudit[]
+  tags                   CatalogEntryTag[]
   createdAt              DateTime               @default(now()) @map("created_at")
   updatedAt              DateTime               @updatedAt @map("updated_at")
 
@@ -278,4 +279,41 @@ model CatalogFieldAudit {
   @@index([catalogEntryId])
   @@index([userId])
   @@map("catalog_field_audits")
+}
+
+// ============================================
+// Tags
+// ============================================
+
+enum TagType {
+  AUTO
+  USER
+}
+
+model Tag {
+  id        String            @id @default(cuid())
+  name      String            @unique
+  color     String            @default("#6B7280")
+  tagType   TagType           @default(USER) @map("tag_type")
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+
+  entries CatalogEntryTag[]
+
+  @@index([tagType])
+  @@map("tags")
+}
+
+model CatalogEntryTag {
+  id             String       @id @default(cuid())
+  catalogEntryId String       @map("catalog_entry_id")
+  catalogEntry   CatalogEntry @relation(fields: [catalogEntryId], references: [id], onDelete: Cascade)
+  tagId          String       @map("tag_id")
+  tag            Tag          @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  assignedAt     DateTime     @default(now()) @map("assigned_at")
+
+  @@unique([catalogEntryId, tagId])
+  @@index([catalogEntryId])
+  @@index([tagId])
+  @@map("catalog_entry_tags")
 }

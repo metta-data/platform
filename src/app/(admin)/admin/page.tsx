@@ -184,6 +184,20 @@ export default function AdminPage() {
             </Button>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Tags</CardTitle>
+            <CardDescription>
+              Manage catalog entry tags and colors
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild>
+              <Link href="/admin/tags">Manage Tags</Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
