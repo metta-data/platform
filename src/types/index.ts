@@ -61,6 +61,20 @@ export interface ColumnDetail {
   defaultValue: string | null;
 }
 
+/** A field selected in the Schema Map query builder */
+export interface SelectedField {
+  /** Field element name on the base table, e.g. "caller_id" */
+  element: string;
+  /** Human-readable label */
+  label: string;
+  /** The table this field is defined on (for inheritance awareness) */
+  definedOnTable: string;
+  /** If this is a reference field, the table it points to */
+  referenceTable: string | null;
+  /** Dot-walked sub-fields selected on the referenced table */
+  dotWalkFields: { element: string; label: string }[];
+}
+
 export interface ComparisonResult {
   addedTables: TableDiff[];
   removedTables: TableDiff[];

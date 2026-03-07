@@ -10,6 +10,7 @@ import {
   ArrowUpRight,
   Minus,
   Plus,
+  Check,
 } from "lucide-react";
 import {
   HEADER_HEIGHT,
@@ -66,8 +67,10 @@ interface TableNodeData {
   onToggleGroup: (nodeId: string, groupName: string) => void;
   onColumnsLoaded: (nodeId: string, ownTableName: string) => void;
   onFieldClick: (nodeId: string, fieldElement: string) => void;
+  onToggleQueryField: (col: ColumnInfo) => void;
   highlightedRefField: string | null;
   expandedGroupNames: Set<string>;
+  querySelectedFields: Set<string>;
   [key: string]: unknown;
 }
 
@@ -352,27 +355,38 @@ function TableNodeComponent({ id, data }: NodeProps) {
                         {group.columns.slice(0, MAX_VISIBLE_ROWS).map((col) => {
                           const isRef = col.referenceTable != null;
                           const isHighlighted = isRef && d.highlightedRefField === col.element;
+                          const isQuerySelected = d.querySelectedFields?.has(col.element);
                           return (
                             <li
                               key={col.element}
-                              onClick={isRef ? (e: React.MouseEvent) => {
+                              onClick={(e: React.MouseEvent) => {
                                 e.stopPropagation();
-                                d.onFieldClick(id, col.element);
-                              } : undefined}
-                              className={`
-                                flex items-center justify-between gap-2 text-xs py-0.5 px-1 rounded
-                                ${isRef
-                                  ? "cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/30"
-                                  : "hover:bg-muted/50"
+                                // For reference fields, also trigger edge highlighting
+                                if (isRef) {
+                                  d.onFieldClick(id, col.element);
                                 }
-                                ${isHighlighted
-                                  ? "bg-blue-100 dark:bg-blue-900/40 ring-1 ring-blue-400/50"
-                                  : ""
+                                // Always toggle query field selection
+                                d.onToggleQueryField(col);
+                              }}
+                              className={`
+                                flex items-center justify-between gap-2 text-xs py-0.5 px-1 rounded cursor-pointer
+                                ${isQuerySelected
+                                  ? "bg-emerald-100 dark:bg-emerald-900/40 ring-1 ring-emerald-400/50"
+                                  : isHighlighted
+                                    ? "bg-blue-100 dark:bg-blue-900/40 ring-1 ring-blue-400/50"
+                                    : isRef
+                                      ? "hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                                      : "hover:bg-muted/50"
                                 }
                               `}
                             >
-                              <span className="truncate min-w-0">
-                                {col.label || col.element}:
+                              <span className="flex items-center gap-1 truncate min-w-0">
+                                {isQuerySelected && (
+                                  <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                                )}
+                                <span className="truncate">
+                                  {col.label || col.element}:
+                                </span>
                               </span>
                               <span className="flex items-center gap-1 flex-shrink-0 text-muted-foreground">
                                 {isRef ? (

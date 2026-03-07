@@ -3,6 +3,14 @@
 import { memo, useCallback } from "react";
 import { Handle, Position } from "@xyflow/react";
 import type { NodeProps } from "@xyflow/react";
+import { ChevronDown, ChevronRight, Check } from "lucide-react";
+import { FIELD_ROW_H } from "./constants";
+
+interface DotWalkColumn {
+  element: string;
+  label: string;
+  internalType: string;
+}
 
 interface MiniNodeData {
   label: string;
@@ -11,8 +19,21 @@ interface MiniNodeData {
   isTruncated: boolean;
   totalColumnCount: number;
   onDoubleClick: (tableName: string) => void;
+  // Dot-walk expansion props
+  dotWalkExpanded: boolean;
+  dotWalkColumns: DotWalkColumn[];
+  dotWalkSelectedFields: Set<string>;
+  dotWalkLoading: boolean;
+  parentRefElement: string | null;
+  onToggleDotWalkExpand: (tableName: string) => void;
+  onToggleDotWalkField: (
+    parentElement: string,
+    child: { element: string; label: string }
+  ) => void;
   [key: string]: unknown;
 }
+
+const MAX_DOT_WALK_ROWS = 20;
 
 function MiniNodeComponent({ data }: NodeProps) {
   const d = data as unknown as MiniNodeData;
@@ -25,28 +46,82 @@ function MiniNodeComponent({ data }: NodeProps) {
     [d]
   );
 
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      // Only expand if there's a parent reference element selected
+      if (d.parentRefElement) {
+        d.onToggleDotWalkExpand(d.name);
+      }
+    },
+    [d]
+  );
+
+  const isExpandable = !!d.parentRefElement;
+  const isExpanded = d.dotWalkExpanded && isExpandable;
+
   return (
     <div
-      className="bg-muted/80 rounded-md border border-border/60 px-3 py-1.5 cursor-pointer hover:bg-muted hover:border-border transition-colors"
-      style={{ width: 160 }}
+      className={`bg-muted/80 rounded-md border transition-colors ${
+        isExpandable
+          ? "border-emerald-400/60 hover:border-emerald-500 cursor-pointer"
+          : "border-border/60 hover:border-border cursor-pointer"
+      }`}
+      style={{ width: isExpanded ? 220 : 160 }}
+      onClick={handleClick}
       onDoubleClick={handleDoubleClick}
-      title={`${d.label} (${d.name}) — double-click to explore`}
+      title={
+        isExpandable
+          ? `${d.label} (${d.name}) — click to ${isExpanded ? "collapse" : "expand"} for dot-walking, double-click to explore`
+          : `${d.label} (${d.name}) — double-click to explore`
+      }
     >
       {/* Handles — all 4 sides with IDs */}
-      <Handle type="target" position={Position.Top} id="top"
-        className="!bg-transparent !border-0 !w-1 !h-1" />
-      <Handle type="source" position={Position.Bottom} id="bottom"
-        className="!bg-transparent !border-0 !w-1 !h-1" />
-      <Handle type="target" position={Position.Left} id="left"
-        className="!bg-transparent !border-0 !w-1 !h-1" />
-      <Handle type="source" position={Position.Right} id="right"
-        className="!bg-transparent !border-0 !w-1 !h-1" />
+      <Handle
+        type="target"
+        position={Position.Top}
+        id="top"
+        className="!bg-transparent !border-0 !w-1 !h-1"
+      />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="bottom"
+        className="!bg-transparent !border-0 !w-1 !h-1"
+      />
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="left"
+        className="!bg-transparent !border-0 !w-1 !h-1"
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="right"
+        className="!bg-transparent !border-0 !w-1 !h-1"
+      />
       {/* Extra target on right side for reference edges from hierarchy peers */}
-      <Handle type="target" position={Position.Right} id="right-target"
-        className="!bg-transparent !border-0 !w-1 !h-1" style={{ top: '60%' }} />
+      <Handle
+        type="target"
+        position={Position.Right}
+        id="right-target"
+        className="!bg-transparent !border-0 !w-1 !h-1"
+        style={{ top: "60%" }}
+      />
 
-      <div className="flex items-center gap-1.5">
-        <span className="text-xs text-muted-foreground truncate max-w-[140px] font-medium">
+      {/* Header */}
+      <div className="flex items-center gap-1.5 px-3 py-1.5">
+        {isExpandable && (
+          <span className="flex-shrink-0 text-emerald-600 dark:text-emerald-400">
+            {isExpanded ? (
+              <ChevronDown className="w-3 h-3" />
+            ) : (
+              <ChevronRight className="w-3 h-3" />
+            )}
+          </span>
+        )}
+        <span className="text-xs text-muted-foreground truncate font-medium">
           {d.label}
         </span>
         {d.isTruncated && (
@@ -55,6 +130,65 @@ function MiniNodeComponent({ data }: NodeProps) {
           </span>
         )}
       </div>
+
+      {/* Expanded column list for dot-walking */}
+      {isExpanded && (
+        <div className="border-t border-border/40 px-2 py-1 max-h-[300px] overflow-y-auto">
+          {d.dotWalkLoading ? (
+            <div className="text-[10px] text-muted-foreground py-1 px-1 animate-pulse">
+              Loading columns...
+            </div>
+          ) : d.dotWalkColumns.length === 0 ? (
+            <div className="text-[10px] text-muted-foreground py-1 px-1">
+              No columns
+            </div>
+          ) : (
+            <ul className="space-y-0">
+              {d.dotWalkColumns.slice(0, MAX_DOT_WALK_ROWS).map((col) => {
+                const isSelected = d.dotWalkSelectedFields?.has(col.element);
+                return (
+                  <li
+                    key={col.element}
+                    onClick={(e: React.MouseEvent) => {
+                      e.stopPropagation();
+                      if (d.parentRefElement) {
+                        d.onToggleDotWalkField(d.parentRefElement, {
+                          element: col.element,
+                          label: col.label,
+                        });
+                      }
+                    }}
+                    className={`
+                      flex items-center justify-between gap-1 text-[11px] rounded cursor-pointer
+                      ${
+                        isSelected
+                          ? "bg-emerald-100 dark:bg-emerald-900/40 ring-1 ring-emerald-400/50"
+                          : "hover:bg-muted"
+                      }
+                    `}
+                    style={{ height: FIELD_ROW_H, padding: "0 4px" }}
+                  >
+                    <span className="flex items-center gap-1 truncate min-w-0">
+                      {isSelected && (
+                        <Check className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                      )}
+                      <span className="truncate">{col.label || col.element}</span>
+                    </span>
+                    <span className="text-[9px] text-muted-foreground flex-shrink-0">
+                      {col.internalType}
+                    </span>
+                  </li>
+                );
+              })}
+              {d.dotWalkColumns.length > MAX_DOT_WALK_ROWS && (
+                <li className="text-[9px] text-muted-foreground py-0.5 px-1">
+                  +{d.dotWalkColumns.length - MAX_DOT_WALK_ROWS} more...
+                </li>
+              )}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -12,15 +12,36 @@ import {
 const DETAILED_NODE_WIDTH = 240;
 const DETAILED_NODE_HEIGHT = 80;
 const MINI_NODE_WIDTH = 160;
+const MINI_NODE_EXPANDED_WIDTH = 220;
 const MINI_NODE_HEIGHT = 36;
+const MAX_DOT_WALK_ROWS = 20;
 
 const REF_COL_GAP = 12; // vertical gap between reference target nodes
 const REF_OFFSET = 320; // horizontal gap between hierarchy and reference column
 
 function getNodeDimensions(node: Node) {
   const isMini = node.type === "miniNode";
-  const width = isMini ? MINI_NODE_WIDTH : DETAILED_NODE_WIDTH;
+  const isDotWalkExpanded = isMini && node.data?.dotWalkExpanded;
+  const width = isMini
+    ? isDotWalkExpanded
+      ? MINI_NODE_EXPANDED_WIDTH
+      : MINI_NODE_WIDTH
+    : DETAILED_NODE_WIDTH;
   let height = isMini ? MINI_NODE_HEIGHT : DETAILED_NODE_HEIGHT;
+
+  // Expanded MiniNode: add height for dot-walk column list
+  if (isDotWalkExpanded) {
+    const cols = node.data?.dotWalkColumns as { element: string }[] | undefined;
+    const colCount = cols ? Math.min(cols.length, MAX_DOT_WALK_ROWS) : 0;
+    if (colCount > 0) {
+      height += 1 + GROUP_PAD * 2 + colCount * FIELD_ROW_H; // border-t + padding + rows
+      if (cols && cols.length > MAX_DOT_WALK_ROWS) {
+        height += FIELD_ROW_H; // "+N more..." row
+      }
+    } else {
+      height += 24; // Loading/empty state
+    }
+  }
 
   if (!isMini && node.data?.expanded) {
     if (node.data.isCenter) {

@@ -152,9 +152,15 @@ function buildEdgesFromGraphData(
 // ---------------------------------------------------------------------------
 
 function SchemaMapInner() {
-  const { selectedSnapshotId, selectedTable, setSelectedTable } =
+  const { selectedSnapshotId, selectedTable, setSelectedTable, queryBuilderFields, toggleField } =
     useExplorerStore();
   const { fitView } = useReactFlow();
+
+  // Compute a Set of selected field element names for fast lookup in nodes
+  const querySelectedFieldSet = useMemo(
+    () => new Set(queryBuilderFields.map((f) => f.element)),
+    [queryBuilderFields]
+  );
 
   const [graphData, setGraphData] = useState<GraphResponse | null>(null);
   const [centerTable, setCenterTable] = useState<string | null>(null);
@@ -173,6 +179,17 @@ function SchemaMapInner() {
     null
   );
 
+  // Dot-walk expansion state
+  const [dotWalkExpandedNodes, setDotWalkExpandedNodes] = useState<Set<string>>(
+    new Set()
+  );
+  const [dotWalkColumns, setDotWalkColumns] = useState<
+    Map<string, { element: string; label: string; internalType: string }[]>
+  >(new Map());
+  const [dotWalkLoadingNodes, setDotWalkLoadingNodes] = useState<Set<string>>(
+    new Set()
+  );
+
   const abortRef = useRef<AbortController | null>(null);
 
   // Sync centerTable with selectedTable from tree
@@ -183,6 +200,9 @@ function SchemaMapInner() {
       setExpandedGroups(new Map());
       setColumnsLoadedNodes(new Set());
       setHighlightedRefField(null);
+      setDotWalkExpandedNodes(new Set());
+      setDotWalkColumns(new Map());
+      setDotWalkLoadingNodes(new Set());
     }
   }, [selectedTable, centerTable]);
 
@@ -245,6 +265,68 @@ function SchemaMapInner() {
     []
   );
 
+  const handleToggleQueryField = useCallback(
+    (col: { element: string; label: string; definedOnTable: string; referenceTable: string | null }) => {
+      toggleField({
+        element: col.element,
+        label: col.label,
+        definedOnTable: col.definedOnTable,
+        referenceTable: col.referenceTable,
+      });
+    },
+    [toggleField]
+  );
+
+  const handleToggleDotWalkExpand = useCallback(
+    (tableName: string) => {
+      setDotWalkExpandedNodes((prev) => {
+        const next = new Set(prev);
+        if (next.has(tableName)) {
+          next.delete(tableName);
+        } else {
+          next.add(tableName);
+          // Fetch columns if we haven't already
+          if (!dotWalkColumns.has(tableName) && selectedSnapshotId) {
+            setDotWalkLoadingNodes((p) => new Set([...p, tableName]));
+            fetch(
+              `/api/tables/${encodeURIComponent(tableName)}?snapshotId=${selectedSnapshotId}`
+            )
+              .then((r) => r.json())
+              .then((detail) => {
+                const cols = (detail.columns || []).map(
+                  (c: { element: string; label: string; internalType: string }) => ({
+                    element: c.element,
+                    label: c.label,
+                    internalType: c.internalType,
+                  })
+                );
+                setDotWalkColumns((prev) => new Map(prev).set(tableName, cols));
+              })
+              .catch(console.error)
+              .finally(() => {
+                setDotWalkLoadingNodes((p) => {
+                  const next = new Set(p);
+                  next.delete(tableName);
+                  return next;
+                });
+              });
+          }
+        }
+        return next;
+      });
+    },
+    [dotWalkColumns, selectedSnapshotId]
+  );
+
+  const { toggleDotWalkField } = useExplorerStore();
+
+  const handleToggleDotWalkField = useCallback(
+    (parentElement: string, child: { element: string; label: string }) => {
+      toggleDotWalkField(parentElement, child);
+    },
+    [toggleDotWalkField]
+  );
+
   const handleRecenter = useCallback(
     (tableName: string) => {
       setCenterTable(tableName);
@@ -253,6 +335,9 @@ function SchemaMapInner() {
       setExpandedGroups(new Map());
       setColumnsLoadedNodes(new Set());
       setHighlightedRefField(null);
+      setDotWalkExpandedNodes(new Set());
+      setDotWalkColumns(new Map());
+      setDotWalkLoadingNodes(new Set());
     },
     [setSelectedTable]
   );
@@ -333,36 +418,78 @@ function SchemaMapInner() {
       );
     }
 
-    const rfNodes: Node[] = visibleGraphNodes.map((n) => ({
-      id: n.name,
-      type: n.isDetailed && !(showRefs && !n.isCenter) ? "tableNode" : "miniNode",
-      position: { x: 0, y: 0 },
-      data: {
-        label: n.label,
-        name: n.name,
-        scopeName: n.scopeName,
-        scopeLabel: n.scopeLabel,
-        ownColumnCount: n.ownColumnCount,
-        totalColumnCount: n.totalColumnCount,
-        childTableCount: n.childTableCount,
-        isCenter: n.isCenter,
-        isTruncated: n.isTruncated,
-        isDetailed: n.isDetailed,
-        isReferenceTarget: n.isReferenceTarget || (showRefs && !n.isCenter),
-        ancestorOwnCounts: n.ancestorOwnCounts,
-        expanded: expandedNodes.has(n.name),
-        columnCount: n.ownColumnCount,
-        snapshotId: selectedSnapshotId,
-        onToggleExpand: handleToggleExpand,
-        onDoubleClick: handleRecenter,
-        onToggleGroup: handleToggleGroup,
-        onColumnsLoaded: handleColumnsLoaded,
-        onFieldClick: handleFieldClick,
-        highlightedRefField,
-        expandedGroupNames:
-          expandedGroups.get(n.name) || EMPTY_GROUP_NAMES,
-      },
-    }));
+    // Build a map: target table name → highlighted reference field element
+    // This tells each MiniNode which parent reference field currently points to it
+    const refTargetToParentField = new Map<string, string>();
+    if (highlightedRefField) {
+      for (const e of graphData.edges) {
+        if (e.type === "reference" && e.fields) {
+          for (const f of e.fields) {
+            if (f.element === highlightedRefField) {
+              refTargetToParentField.set(e.target, highlightedRefField);
+            }
+          }
+        }
+      }
+    }
+
+    // Build dot-walk selected fields per MiniNode (from store's queryBuilderFields)
+    const dotWalkSelectedByTable = new Map<string, Set<string>>();
+    for (const qf of queryBuilderFields) {
+      if (qf.referenceTable && qf.dotWalkFields.length > 0) {
+        const existing = dotWalkSelectedByTable.get(qf.referenceTable) || new Set<string>();
+        for (const dw of qf.dotWalkFields) {
+          existing.add(dw.element);
+        }
+        dotWalkSelectedByTable.set(qf.referenceTable, existing);
+      }
+    }
+
+    const rfNodes: Node[] = visibleGraphNodes.map((n) => {
+      const isMiniNode = !(n.isDetailed && !(showRefs && !n.isCenter));
+      const parentRefElement = refTargetToParentField.get(n.name) || null;
+
+      return {
+        id: n.name,
+        type: isMiniNode ? "miniNode" : "tableNode",
+        position: { x: 0, y: 0 },
+        data: {
+          label: n.label,
+          name: n.name,
+          scopeName: n.scopeName,
+          scopeLabel: n.scopeLabel,
+          ownColumnCount: n.ownColumnCount,
+          totalColumnCount: n.totalColumnCount,
+          childTableCount: n.childTableCount,
+          isCenter: n.isCenter,
+          isTruncated: n.isTruncated,
+          isDetailed: n.isDetailed,
+          isReferenceTarget: n.isReferenceTarget || (showRefs && !n.isCenter),
+          ancestorOwnCounts: n.ancestorOwnCounts,
+          expanded: expandedNodes.has(n.name),
+          columnCount: n.ownColumnCount,
+          snapshotId: selectedSnapshotId,
+          onToggleExpand: handleToggleExpand,
+          onDoubleClick: handleRecenter,
+          onToggleGroup: handleToggleGroup,
+          onColumnsLoaded: handleColumnsLoaded,
+          onFieldClick: handleFieldClick,
+          onToggleQueryField: handleToggleQueryField,
+          highlightedRefField,
+          expandedGroupNames:
+            expandedGroups.get(n.name) || EMPTY_GROUP_NAMES,
+          querySelectedFields: querySelectedFieldSet,
+          // Dot-walk props for MiniNodes
+          dotWalkExpanded: dotWalkExpandedNodes.has(n.name),
+          dotWalkColumns: dotWalkColumns.get(n.name) || [],
+          dotWalkSelectedFields: dotWalkSelectedByTable.get(n.name) || EMPTY_GROUP_NAMES,
+          dotWalkLoading: dotWalkLoadingNodes.has(n.name),
+          parentRefElement,
+          onToggleDotWalkExpand: handleToggleDotWalkExpand,
+          onToggleDotWalkField: handleToggleDotWalkField,
+        },
+      };
+    });
 
     // Build layout edges (only inheritance for dagre positioning)
     const inhSource = direction === "TB" ? "bottom" : "right";
@@ -399,7 +526,15 @@ function SchemaMapInner() {
     handleToggleGroup,
     handleColumnsLoaded,
     handleFieldClick,
+    handleToggleQueryField,
     highlightedRefField,
+    querySelectedFieldSet,
+    queryBuilderFields,
+    dotWalkExpandedNodes,
+    dotWalkColumns,
+    dotWalkLoadingNodes,
+    handleToggleDotWalkExpand,
+    handleToggleDotWalkField,
   ]);
 
   // Fit view when new graph data loads or view mode changes
@@ -475,6 +610,9 @@ function SchemaMapInner() {
       setExpandedGroups(new Map());
       setColumnsLoadedNodes(new Set());
       setHighlightedRefField(null);
+      setDotWalkExpandedNodes(new Set());
+      setDotWalkColumns(new Map());
+      setDotWalkLoadingNodes(new Set());
     },
     [setSelectedTable]
   );

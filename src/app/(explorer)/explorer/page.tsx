@@ -7,6 +7,7 @@ import { VersionSelector } from "@/components/explorer/version-selector";
 import { ScopeFilter } from "@/components/explorer/scope-filter";
 import { SearchBar } from "@/components/explorer/search-bar";
 import { SchemaMap } from "@/components/schema-map/schema-map";
+import { QueryBuilderPanel } from "@/components/schema-map/query-builder-panel";
 import { useExplorerStore } from "@/stores/explorer-store";
 import { Table2, Map } from "lucide-react";
 import type { SnapshotSummary } from "@/types";
@@ -87,9 +88,19 @@ export default function ExplorerPage() {
 
       {/* Main content: tree + detail/map */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Tree panel */}
-        <div className="w-[380px] border-r overflow-hidden flex-shrink-0">
-          <SchemaTree onSelectTable={handleSelectTable} />
+        {/* Tree panel + Query Builder */}
+        <div className="w-[380px] border-r overflow-hidden flex-shrink-0 flex flex-col">
+          <div className="flex-1 overflow-hidden min-h-[200px]">
+            <SchemaTree onSelectTable={handleSelectTable} />
+          </div>
+          {viewMode === "map" && selectedTable && (
+            <>
+              <div className="border-t" />
+              <div className="h-[340px] flex-shrink-0 overflow-auto">
+                <QueryBuilderPanel />
+              </div>
+            </>
+          )}
         </div>
 
         {/* Right panel — switches between Detail and Schema Map */}
