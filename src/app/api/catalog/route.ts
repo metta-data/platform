@@ -16,12 +16,28 @@ export async function GET(request: Request) {
   const where: Prisma.CatalogEntryWhereInput = {};
 
   if (search) {
-    where.OR = [
-      { tableName: { contains: search, mode: "insensitive" } },
-      { element: { contains: search, mode: "insensitive" } },
-      { label: { contains: search, mode: "insensitive" } },
-      { definition: { contains: search, mode: "insensitive" } },
-    ];
+    // Support "table.column" syntax for targeted search
+    const dotIndex = search.indexOf(".");
+    if (dotIndex > 0 && dotIndex < search.length - 1) {
+      const tablePart = search.slice(0, dotIndex);
+      const columnPart = search.slice(dotIndex + 1);
+      where.AND = [
+        { tableName: { contains: tablePart, mode: "insensitive" } },
+        {
+          OR: [
+            { element: { contains: columnPart, mode: "insensitive" } },
+            { label: { contains: columnPart, mode: "insensitive" } },
+          ],
+        },
+      ];
+    } else {
+      where.OR = [
+        { tableName: { contains: search, mode: "insensitive" } },
+        { element: { contains: search, mode: "insensitive" } },
+        { label: { contains: search, mode: "insensitive" } },
+        { definition: { contains: search, mode: "insensitive" } },
+      ];
+    }
   }
 
   if (table) {

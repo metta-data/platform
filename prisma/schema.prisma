@@ -222,6 +222,7 @@ model CatalogEntry {
   definition             String?
   definitionSource       DefinitionSource?      @map("definition_source")
   definitionSourceDetail String?                @map("definition_source_detail")
+  citationUrl            String?                @map("citation_url")
   validationStatus       ValidationStatus       @default(DRAFT) @map("validation_status")
   validatedAt            DateTime?              @map("validated_at")
   validatedById          String?                @map("validated_by_id")

@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { LinkifiedText } from "@/components/ui/linkified-text";
 import {
   Table,
   TableBody,
@@ -47,6 +48,7 @@ interface CatalogEntrySummary {
 interface CatalogEntryDetail {
   entry: CatalogEntrySummary & {
     definitionSourceDetail: string | null;
+    citationUrl: string | null;
     validatedAt: string | null;
     validatedBy: {
       id: string;
@@ -131,6 +133,15 @@ export default function CatalogPage() {
     model: string;
     modelId: string;
     provider: string;
+    docsUrl: string | null;
+    confidence: "high" | "medium" | "low" | "none";
+    citations: {
+      url: string;
+      pageTitle: string;
+      evidenceText: string;
+      sectionHeading?: string;
+    }[];
+    notes?: string | null;
   } | null>(null);
 
   // Bulk selection state
@@ -239,13 +250,19 @@ export default function CatalogPage() {
     if (!selectedEntry) return;
     setSaving(true);
     try {
-      // If saving an AI draft, include source metadata
-      const payload: Record<string, string | undefined> = {
+      // If saving an AI draft, include source metadata and citation URL
+      const payload: Record<string, string | undefined | null> = {
         definition: editDefinition,
       };
       if (aiDraftMeta) {
         payload.definitionSource = "AI_GENERATED";
-        payload.definitionSourceDetail = `AI: ${aiDraftMeta.model} (${aiDraftMeta.modelId})`;
+        const citedCount = aiDraftMeta.citations.length;
+        const confidenceLabel =
+          aiDraftMeta.confidence !== "none"
+            ? `cited from ${citedCount} source${citedCount !== 1 ? "s" : ""}`
+            : "uncited";
+        payload.definitionSourceDetail = `AI: ${aiDraftMeta.model} (${confidenceLabel})`;
+        payload.citationUrl = aiDraftMeta.docsUrl;
       }
 
       const res = await fetch(
@@ -269,6 +286,7 @@ export default function CatalogPage() {
                 definition: updated.definition,
                 definitionSource: updated.definitionSource,
                 definitionSourceDetail: updated.definitionSourceDetail,
+                citationUrl: updated.citationUrl,
                 validationStatus: updated.validationStatus,
               },
             }
@@ -320,6 +338,10 @@ export default function CatalogPage() {
         model: data.model,
         modelId: data.modelId,
         provider: data.provider,
+        docsUrl: data.docsUrl || null,
+        confidence: data.confidence || "none",
+        citations: data.citations || [],
+        notes: data.notes || null,
       });
       setEditing(true);
     } catch {
@@ -586,7 +608,7 @@ export default function CatalogPage() {
       {/* Filters */}
       <div className="flex flex-wrap gap-3 mb-4">
         <Input
-          placeholder="Search fields..."
+          placeholder="Search fields... (try table.column)"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           className="w-64"
@@ -964,9 +986,26 @@ export default function CatalogPage() {
                             Definition
                           </label>
                           {aiDraftMeta && (
-                            <span className="text-xs text-muted-foreground">
-                              Drafted by {aiDraftMeta.model}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">
+                                Drafted by {aiDraftMeta.model}
+                              </span>
+                              {aiDraftMeta.confidence === "high" && (
+                                <Badge variant="default" className="text-[10px] px-1.5 py-0 bg-green-600 hover:bg-green-600">
+                                  Cited
+                                </Badge>
+                              )}
+                              {aiDraftMeta.confidence === "medium" && (
+                                <Badge variant="default" className="text-[10px] px-1.5 py-0 bg-yellow-600 hover:bg-yellow-600">
+                                  Partial
+                                </Badge>
+                              )}
+                              {(aiDraftMeta.confidence === "low" || aiDraftMeta.confidence === "none") && (
+                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                  Uncited
+                                </Badge>
+                              )}
+                            </div>
                           )}
                         </div>
                         <textarea
@@ -975,6 +1014,35 @@ export default function CatalogPage() {
                           onChange={(e) => setEditDefinition(e.target.value)}
                           placeholder="Enter a definition for this field..."
                         />
+                        {aiDraftMeta && aiDraftMeta.citations.length > 0 && (
+                          <div className="rounded-md border bg-muted/50 p-3 space-y-2">
+                            <p className="text-xs font-medium text-muted-foreground">
+                              Evidence from ServiceNow docs
+                            </p>
+                            {aiDraftMeta.citations.map((c, i) => (
+                              <div key={i} className="text-xs space-y-0.5">
+                                <p className="text-muted-foreground italic">
+                                  &ldquo;{c.evidenceText}&rdquo;
+                                </p>
+                                <a
+                                  href={c.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:underline dark:text-blue-400"
+                                >
+                                  {c.pageTitle}
+                                  {c.sectionHeading ? ` > ${c.sectionHeading}` : ""}
+                                  {" \u2192"}
+                                </a>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {aiDraftMeta?.notes && (
+                          <p className="text-xs text-muted-foreground italic">
+                            {aiDraftMeta.notes}
+                          </p>
+                        )}
                         {draftError && (
                           <p className="text-sm text-destructive">{draftError}</p>
                         )}
@@ -1046,7 +1114,9 @@ export default function CatalogPage() {
                           <p className="text-sm text-destructive mb-2">{draftError}</p>
                         )}
                         <p className="text-sm whitespace-pre-wrap">
-                          {detail.entry.definition || (
+                          {detail.entry.definition ? (
+                            <LinkifiedText text={detail.entry.definition} />
+                          ) : (
                             <span className="italic text-muted-foreground">
                               No definition yet
                             </span>
@@ -1063,6 +1133,16 @@ export default function CatalogPage() {
                               </span>
                             )}
                           </p>
+                        )}
+                        {detail.entry.citationUrl && (
+                          <a
+                            href={detail.entry.citationUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline dark:text-blue-400 mt-1"
+                          >
+                            ServiceNow docs &rarr;
+                          </a>
                         )}
                       </div>
                     )}
