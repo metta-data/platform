@@ -45,7 +45,7 @@ function AuthControls() {
       ))}
 
       <div className="ml-auto flex items-center gap-3">
-        <CommitHash />
+        <VersionLabel />
         {status === "loading" ? (
           <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
         ) : session?.user ? (
@@ -98,14 +98,17 @@ function AuthControls() {
   );
 }
 
-function CommitHash() {
+function VersionLabel() {
+  const version = process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0";
+  const commit = process.env.NEXT_PUBLIC_COMMIT_HASH || "dev";
   return (
-    <span
-      className="text-[10px] text-muted-foreground/50 font-mono select-all"
-      title="Build version"
+    <Link
+      href="/version"
+      className="text-[10px] text-muted-foreground/50 font-mono hover:text-muted-foreground transition-colors"
+      title={`Build ${commit}`}
     >
-      {process.env.NEXT_PUBLIC_COMMIT_HASH}
-    </span>
+      v{version}
+    </Link>
   );
 }
 
@@ -139,7 +142,7 @@ export function Header() {
           <AuthControls />
         ) : (
           <div className="ml-auto flex items-center gap-3">
-            <CommitHash />
+            <VersionLabel />
           </div>
         )}
       </div>
