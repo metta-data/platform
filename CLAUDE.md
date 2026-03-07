@@ -42,7 +42,7 @@ This project follows [Semantic Versioning](https://semver.org/) and maintains a 
 
 **When making changes, always:**
 
-1. **Update `CHANGELOG.md`** — Add entries under the `[Unreleased]` section using the appropriate category (Added, Changed, Deprecated, Removed, Fixed, Security). Every user-facing change should be documented.
+1. **Update `CHANGELOG.md` in every commit** — Add entries under the `[Unreleased]` section as part of the same commit that introduces the change. Use the appropriate category (Added, Changed, Deprecated, Removed, Fixed, Security). Every user-facing change should be documented. Do not defer changelog updates to a later commit.
 
 2. **Before a release** — Move `[Unreleased]` entries into a new version section with today's date. Update the comparison links at the bottom of the file.
 
@@ -50,7 +50,7 @@ This project follows [Semantic Versioning](https://semver.org/) and maintains a 
 
 4. **Tag releases** — After committing a version bump, create a git tag: `git tag v0.x.0`
 
-5. **Planned features** — Items in the `[Unreleased]` section represent planned work. Keep this section current as plans evolve.
+5. **Planned features** — Items in the `[Unreleased]` section may include planned work that is not yet implemented. Keep this section current as plans evolve.
 
 ## Auth & Roles
 
