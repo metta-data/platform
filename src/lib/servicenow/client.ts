@@ -187,6 +187,60 @@ export class ServiceNowClient {
   }
 
   /**
+   * Lightweight fetch of reference field mappings from sys_dictionary.
+   * Returns an array of { tableName, element, refSysId, refLabel } for
+   * every column that has a non-empty reference target.
+   */
+  async fetchReferenceFields(): Promise<
+    { tableName: string; element: string; refSysId: string; refLabel: string }[]
+  > {
+    const endpoint = "/api/now/table/sys_dictionary";
+    const query =
+      "internal_type=reference^elementISNOTEMPTY^referenceISNOTEMPTY";
+    const fields = "name,element,reference";
+
+    const total = await this.getTotalCount(endpoint, query);
+
+    type RefRecord = {
+      name: { value: string; display_value: string } | string;
+      element: { value: string; display_value: string } | string;
+      reference: { value: string; display_value: string } | string;
+    };
+
+    const results: {
+      tableName: string;
+      element: string;
+      refSysId: string;
+      refLabel: string;
+    }[] = [];
+    let offset = 0;
+
+    while (offset < total) {
+      const response = await this.fetchApi<RefRecord>(endpoint, {
+        sysparm_fields: fields,
+        sysparm_query: query,
+        sysparm_limit: String(COLUMN_BATCH_SIZE),
+        sysparm_offset: String(offset),
+        sysparm_display_value: "all",
+      });
+
+      for (const rec of response.result) {
+        const tableName = getValue(rec.name);
+        const element = getValue(rec.element);
+        const refSysId = getValue(rec.reference);
+        const refLabel = getDisplayValue(rec.reference);
+        if (tableName && element && (refSysId || refLabel)) {
+          results.push({ tableName, element, refSysId, refLabel });
+        }
+      }
+
+      offset += COLUMN_BATCH_SIZE;
+    }
+
+    return results;
+  }
+
+  /**
    * Tests connectivity by fetching a count of sys_db_object records.
    * Returns the table count on success, or throws with a descriptive error.
    */
@@ -290,8 +344,9 @@ export class ServiceNowClient {
       definedOnTable: getValue(record.name),
       internalType: getDisplayValue(record.internal_type) || "string",
       // reference is a reference field to sys_db_object: value = sys_id of target table
-      // We store the sys_id here and resolve to table name during ingestion post-processing
+      // display_value = table label (e.g. "User"). We store both for fallback resolution.
       referenceTableSysId: getValue(record.reference) || null,
+      referenceTableLabel: getDisplayValue(record.reference) || null,
       referenceTable: null as string | null, // resolved post-parse via sysId lookup
       maxLength: getValue(record.max_length) ? parseInt(getValue(record.max_length), 10) : null,
       isMandatory: getValue(record.mandatory) === "true",

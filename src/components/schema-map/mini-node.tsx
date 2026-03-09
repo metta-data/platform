@@ -1,9 +1,9 @@
 "use client";
 
-import { memo, useCallback } from "react";
-import { Handle, Position } from "@xyflow/react";
+import { memo, useCallback, useMemo } from "react";
+import { Handle, Position, useUpdateNodeInternals } from "@xyflow/react";
 import type { NodeProps } from "@xyflow/react";
-import { ChevronDown, ChevronRight, Check } from "lucide-react";
+import { ChevronDown, ChevronRight, Check, Star } from "lucide-react";
 import { FIELD_ROW_H } from "./constants";
 
 interface DotWalkColumn {
@@ -25,6 +25,7 @@ interface MiniNodeData {
   dotWalkSelectedFields: Set<string>;
   dotWalkLoading: boolean;
   parentRefElement: string | null;
+  displayColumn: string | null;
   onToggleDotWalkExpand: (tableName: string) => void;
   onToggleDotWalkField: (
     parentElement: string,
@@ -35,8 +36,16 @@ interface MiniNodeData {
 
 const MAX_DOT_WALK_ROWS = 20;
 
-function MiniNodeComponent({ data }: NodeProps) {
+// MiniNode header height: px-3 py-1.5 with text-xs
+const MINI_HEADER_H = 28;
+// Border-t on expanded section
+const MINI_BORDER_T = 1;
+// py-1 on expanded column container
+const MINI_COL_PAD = 4;
+
+function MiniNodeComponent({ id, data }: NodeProps) {
   const d = data as unknown as MiniNodeData;
+  const updateNodeInternals = useUpdateNodeInternals();
 
   const handleDoubleClick = useCallback(
     (e: React.MouseEvent) => {
@@ -59,6 +68,34 @@ function MiniNodeComponent({ data }: NodeProps) {
 
   const isExpandable = !!d.parentRefElement;
   const isExpanded = d.dotWalkExpanded && isExpandable;
+
+  // Sort columns: display column first, then alphabetical by label
+  const sortedColumns = useMemo(() => {
+    if (!d.displayColumn || d.dotWalkColumns.length === 0) return d.dotWalkColumns;
+    const displayCol = d.dotWalkColumns.find((c) => c.element === d.displayColumn);
+    if (!displayCol) return d.dotWalkColumns;
+    return [displayCol, ...d.dotWalkColumns.filter((c) => c.element !== d.displayColumn)];
+  }, [d.dotWalkColumns, d.displayColumn]);
+
+  // Compute display column target handle position
+  const displayTargetHandleTop = useMemo(() => {
+    if (!isExpanded || !d.displayColumn || d.dotWalkLoading || sortedColumns.length === 0) {
+      return null;
+    }
+    const visibleCols = sortedColumns.slice(0, MAX_DOT_WALK_ROWS);
+    const rowIndex = visibleCols.findIndex((c) => c.element === d.displayColumn);
+    if (rowIndex === -1) return null;
+
+    // header + border + container padding + row offset + half row height
+    return MINI_HEADER_H + MINI_BORDER_T + MINI_COL_PAD + rowIndex * FIELD_ROW_H + FIELD_ROW_H / 2;
+  }, [isExpanded, d.displayColumn, d.dotWalkLoading, sortedColumns]);
+
+  // Notify React Flow when handles change
+  useMemo(() => {
+    // Trigger on next tick so the DOM has updated
+    requestAnimationFrame(() => updateNodeInternals(id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayTargetHandleTop, id]);
 
   return (
     <div
@@ -110,6 +147,17 @@ function MiniNodeComponent({ data }: NodeProps) {
         style={{ top: "60%" }}
       />
 
+      {/* Dynamic target handle pinned to display column row */}
+      {displayTargetHandleTop != null && (
+        <Handle
+          type="target"
+          position={Position.Left}
+          id="ref-target-display"
+          className="!bg-transparent !border-0 !w-1 !h-1"
+          style={{ top: displayTargetHandleTop }}
+        />
+      )}
+
       {/* Header */}
       <div className="flex items-center gap-1.5 px-3 py-1.5">
         {isExpandable && (
@@ -138,14 +186,15 @@ function MiniNodeComponent({ data }: NodeProps) {
             <div className="text-[10px] text-muted-foreground py-1 px-1 animate-pulse">
               Loading columns...
             </div>
-          ) : d.dotWalkColumns.length === 0 ? (
+          ) : sortedColumns.length === 0 ? (
             <div className="text-[10px] text-muted-foreground py-1 px-1">
               No columns
             </div>
           ) : (
             <ul className="space-y-0">
-              {d.dotWalkColumns.slice(0, MAX_DOT_WALK_ROWS).map((col) => {
+              {sortedColumns.slice(0, MAX_DOT_WALK_ROWS).map((col) => {
                 const isSelected = d.dotWalkSelectedFields?.has(col.element);
+                const isDisplayCol = d.displayColumn === col.element;
                 return (
                   <li
                     key={col.element}
@@ -163,7 +212,9 @@ function MiniNodeComponent({ data }: NodeProps) {
                       ${
                         isSelected
                           ? "bg-emerald-100 dark:bg-emerald-900/40 ring-1 ring-emerald-400/50"
-                          : "hover:bg-muted"
+                          : isDisplayCol
+                            ? "bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-300/50"
+                            : "hover:bg-muted"
                       }
                     `}
                     style={{ height: FIELD_ROW_H, padding: "0 4px" }}
@@ -172,17 +223,27 @@ function MiniNodeComponent({ data }: NodeProps) {
                       {isSelected && (
                         <Check className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
                       )}
+                      {isDisplayCol && !isSelected && (
+                        <Star className="w-2.5 h-2.5 text-blue-500 dark:text-blue-400 flex-shrink-0" />
+                      )}
                       <span className="truncate">{col.label || col.element}</span>
                     </span>
-                    <span className="text-[9px] text-muted-foreground flex-shrink-0">
-                      {col.internalType}
+                    <span className="flex items-center gap-1 flex-shrink-0">
+                      {isDisplayCol && (
+                        <span className="text-[8px] text-blue-600 dark:text-blue-400 font-semibold">
+                          display
+                        </span>
+                      )}
+                      <span className="text-[9px] text-muted-foreground">
+                        {col.internalType}
+                      </span>
                     </span>
                   </li>
                 );
               })}
-              {d.dotWalkColumns.length > MAX_DOT_WALK_ROWS && (
+              {sortedColumns.length > MAX_DOT_WALK_ROWS && (
                 <li className="text-[9px] text-muted-foreground py-0.5 px-1">
-                  +{d.dotWalkColumns.length - MAX_DOT_WALK_ROWS} more...
+                  +{sortedColumns.length - MAX_DOT_WALK_ROWS} more...
                 </li>
               )}
             </ul>

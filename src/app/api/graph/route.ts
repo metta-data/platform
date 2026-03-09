@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { resolveDisplayColumns } from "@/lib/display-columns";
 import type { GraphNode, GraphEdge, GraphResponse } from "@/types/graph";
 
 const MAX_NODES = 250;
@@ -203,6 +204,12 @@ export async function GET(request: Request) {
     }
   }
 
+  // Resolve display columns for all reference target tables
+  const refTargetTableNames = [...referenceTargetNames];
+  const displayColumnMap = refTargetTableNames.length > 0
+    ? await resolveDisplayColumns(snapshotId, refTargetTableNames)
+    : {};
+
   // Build response
   const truncated = nodeDistance.size >= MAX_NODES;
   const nodes: GraphNode[] = [];
@@ -233,6 +240,7 @@ export async function GET(request: Request) {
       isReferenceTarget: referenceTargetNames.has(t.name),
       ancestorOwnCounts:
         t.name === centerTable ? ancestorOwnCounts : undefined,
+      displayColumn: displayColumnMap[t.name],
     });
   }
 

@@ -9,8 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Snowflake and SQL query generator for ServiceNow data ingested via the native Snowflake ServiceNow connector
+- Snowflake SQL query generator in the Schema Map query builder for ServiceNow data ingested via the native Snowflake connector
+- Snowflake locator input (DATABASE.SCHEMA) persisted to localStorage
+- Snowflake SQL uses `__VIEW` suffix per Snowflake connector naming convention
+- LEFT JOIN on referenced tables via `PARSE_JSON(col):value::STRING` for reference fields in Snowflake SQL
+- Auto-include display value column from referenced tables in Snowflake SQL (e.g., `ref_caller_id.NAME AS CALLER_ID__DISPLAY`)
+- Batch API endpoint (`/api/tables/display-columns`) for looking up display columns across multiple tables
+- Schema Map reference edges now point to the display column on the target table (e.g., `caller_id` → `name` on sys_user)
+- Target MiniNodes auto-expand when a reference field is clicked, highlighting the display column row
+- Display column info included in graph API response for reference target nodes
+- Query builder buttons (Generate API, Query ServiceNow, Snowflake SQL) now work with no fields selected, generating open queries that return all columns (LIMIT 10)
+- LEFT JOIN on SYS_CHOICE__VIEW for choice fields to resolve display labels in Snowflake SQL
+- Reference-wins-over-choice rule: reference fields skip SYS_CHOICE JOINs
+- Snowflake SQL API query output (planned)
 - Bulk AI definition drafting (draft definitions for multiple fields at once)
+
+### Changed
+
+- Snowflake SQL output simplified: removed redundant table self-alias, cleaner unknown-reference hints
+
+### Fixed
+
+- Reference table resolution during ingestion uses 3-step chain: direct table name match → sys_id lookup → label lookup (fixes label collisions like `imp_user` vs `sys_user`)
+- Added repair endpoint (`POST /api/snapshots/[id]/repair-references`) to fix reference data in-place without re-ingestion
 
 ## [0.5.0] - 2026-03-07
 

@@ -69,6 +69,8 @@ export interface SelectedField {
   label: string;
   /** The table this field is defined on (for inheritance awareness) */
   definedOnTable: string;
+  /** ServiceNow internal type (e.g. "reference", "choice", "string") */
+  internalType: string;
   /** If this is a reference field, the table it points to */
   referenceTable: string | null;
   /** Dot-walked sub-fields selected on the referenced table */

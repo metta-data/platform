@@ -15,6 +15,8 @@ export interface GraphNode {
   isReferenceTarget: boolean;
   /** Per-ancestor own-column counts for accurate layout height. Center table only. */
   ancestorOwnCounts?: { name: string; ownColumnCount: number }[];
+  /** The display column element name for this table (resolved via ServiceNow's display value chain) */
+  displayColumn?: string;
 }
 
 export interface GraphEdge {

@@ -12,6 +12,10 @@ interface ExplorerState {
   // Query builder state
   queryBuilderFields: SelectedField[];
   queryBuilderInstance: string;
+  queryBuilderSnowflakeLocator: string;
+
+  // Display column cache: referenced table name → display column element (or null if none)
+  displayColumnCache: Record<string, string | null>;
 
   setSnapshot: (id: string) => void;
   setAvailableSnapshots: (snapshots: SnapshotSummary[]) => void;
@@ -25,6 +29,7 @@ interface ExplorerState {
     element: string;
     label: string;
     definedOnTable: string;
+    internalType: string;
     referenceTable: string | null;
   }) => void;
   toggleDotWalkField: (
@@ -35,13 +40,24 @@ interface ExplorerState {
   removeDotWalkField: (parentElement: string, childElement: string) => void;
   clearQueryBuilderFields: () => void;
   setQueryBuilderInstance: (instance: string) => void;
+  setQueryBuilderSnowflakeLocator: (locator: string) => void;
+  fetchDisplayColumns: (snapshotId: string, tableNames: string[]) => Promise<void>;
 }
 
-// Load persisted instance from localStorage
+// Load persisted values from localStorage
 function getPersistedInstance(): string {
   if (typeof window === "undefined") return "";
   try {
     return localStorage.getItem("queryBuilderInstance") || "";
+  } catch {
+    return "";
+  }
+}
+
+function getPersistedSnowflakeLocator(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return localStorage.getItem("queryBuilderSnowflakeLocator") || "";
   } catch {
     return "";
   }
@@ -58,9 +74,11 @@ export const useExplorerStore = create<ExplorerState>((set) => ({
   // Query builder
   queryBuilderFields: [],
   queryBuilderInstance: getPersistedInstance(),
+  queryBuilderSnowflakeLocator: getPersistedSnowflakeLocator(),
+  displayColumnCache: {},
 
   setSnapshot: (id) =>
-    set({ selectedSnapshotId: id, selectedTable: null, queryBuilderFields: [] }),
+    set({ selectedSnapshotId: id, selectedTable: null, queryBuilderFields: [], displayColumnCache: {} }),
   setAvailableSnapshots: (snapshots) => {
     set((state) => ({
       availableSnapshots: snapshots,
@@ -144,5 +162,40 @@ export const useExplorerStore = create<ExplorerState>((set) => ({
       // ignore
     }
     set({ queryBuilderInstance: instance });
+  },
+
+  setQueryBuilderSnowflakeLocator: (locator) => {
+    try {
+      localStorage.setItem("queryBuilderSnowflakeLocator", locator);
+    } catch {
+      // ignore
+    }
+    set({ queryBuilderSnowflakeLocator: locator });
+  },
+
+  fetchDisplayColumns: async (snapshotId, tableNames) => {
+    // Filter to only uncached tables
+    const cache = useExplorerStore.getState().displayColumnCache;
+    const uncached = tableNames.filter((t) => !(t in cache));
+    if (uncached.length === 0) return;
+
+    try {
+      const res = await fetch(
+        `/api/tables/display-columns?snapshotId=${encodeURIComponent(snapshotId)}&tables=${encodeURIComponent(uncached.join(","))}`
+      );
+      if (!res.ok) return;
+      const data: Record<string, string> = await res.json();
+
+      // Merge results — tables not in response have no display column
+      const merged: Record<string, string | null> = {};
+      for (const t of uncached) {
+        merged[t] = data[t] ?? null;
+      }
+      set((state) => ({
+        displayColumnCache: { ...state.displayColumnCache, ...merged },
+      }));
+    } catch {
+      // Silently fail — SQL will render without display columns
+    }
   },
 }));

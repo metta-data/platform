@@ -45,7 +45,9 @@ function buildEdgesFromGraphData(
   expandedGroups: Map<string, Set<string>>,
   columnsLoadedNodes: Set<string>,
   direction: "TB" | "LR",
-  highlightedRefField: string | null
+  highlightedRefField: string | null,
+  dotWalkExpandedTargets: Set<string>,
+  displayColumnByTarget: Map<string, string | null>
 ): Edge[] {
   const inhSource = direction === "TB" ? "bottom" : "right";
   const inhTarget = direction === "TB" ? "top" : "left";
@@ -73,7 +75,15 @@ function buildEdgesFromGraphData(
 
     // --- Reference edges ---
     const targetIsRefOnly = refTargetSet.has(e.target);
-    const targetHandle = targetIsRefOnly ? "left" : "right-target";
+    // If the target MiniNode is expanded and has a display column, pin to it
+    const targetDisplayCol = displayColumnByTarget.get(e.target);
+    const targetIsExpandedWithDisplay =
+      dotWalkExpandedTargets.has(e.target) && !!targetDisplayCol;
+    const targetHandle = targetIsExpandedWithDisplay
+      ? "ref-target-display"
+      : targetIsRefOnly
+        ? "left"
+        : "right-target";
 
     const isSourceExpanded =
       expandedNodes.has(e.source) && columnsLoadedNodes.has(e.source);
@@ -255,22 +265,13 @@ function SchemaMapInner() {
     []
   );
 
-  const handleFieldClick = useCallback(
-    (_nodeId: string, fieldElement: string) => {
-      // Toggle: click same field again to deselect
-      setHighlightedRefField((prev) =>
-        prev === fieldElement ? null : fieldElement
-      );
-    },
-    []
-  );
-
   const handleToggleQueryField = useCallback(
-    (col: { element: string; label: string; definedOnTable: string; referenceTable: string | null }) => {
+    (col: { element: string; label: string; definedOnTable: string; internalType: string; referenceTable: string | null }) => {
       toggleField({
         element: col.element,
         label: col.label,
         definedOnTable: col.definedOnTable,
+        internalType: col.internalType,
         referenceTable: col.referenceTable,
       });
     },
@@ -316,6 +317,29 @@ function SchemaMapInner() {
       });
     },
     [dotWalkColumns, selectedSnapshotId]
+  );
+
+  const handleFieldClick = useCallback(
+    (_nodeId: string, fieldElement: string) => {
+      // Toggle: click same field again to deselect
+      const newValue = highlightedRefField === fieldElement ? null : fieldElement;
+      setHighlightedRefField(newValue);
+
+      // Auto-expand the target MiniNode when highlighting a reference field
+      if (newValue && graphData) {
+        for (const e of graphData.edges) {
+          if (e.type === "reference" && e.fields) {
+            for (const f of e.fields) {
+              if (f.element === newValue && !dotWalkExpandedNodes.has(e.target)) {
+                // Trigger expansion of the target node
+                handleToggleDotWalkExpand(e.target);
+              }
+            }
+          }
+        }
+      }
+    },
+    [highlightedRefField, graphData, dotWalkExpandedNodes, handleToggleDotWalkExpand]
   );
 
   const { toggleDotWalkField } = useExplorerStore();
@@ -485,6 +509,7 @@ function SchemaMapInner() {
           dotWalkSelectedFields: dotWalkSelectedByTable.get(n.name) || EMPTY_GROUP_NAMES,
           dotWalkLoading: dotWalkLoadingNodes.has(n.name),
           parentRefElement,
+          displayColumn: n.displayColumn || null,
           onToggleDotWalkExpand: handleToggleDotWalkExpand,
           onToggleDotWalkField: handleToggleDotWalkField,
         },
@@ -567,6 +592,14 @@ function SchemaMapInner() {
           graphData.nodes.filter((n) => n.isReferenceTarget).map((n) => n.name)
         );
 
+    // Build display column lookup for reference targets
+    const displayColumnByTarget = new Map<string, string | null>();
+    for (const n of graphData.nodes) {
+      if (n.displayColumn) {
+        displayColumnByTarget.set(n.name, n.displayColumn);
+      }
+    }
+
     return buildEdgesFromGraphData(
       visibleEdges,
       includedNames,
@@ -575,7 +608,9 @@ function SchemaMapInner() {
       expandedGroups,
       columnsLoadedNodes,
       direction,
-      highlightedRefField
+      highlightedRefField,
+      dotWalkExpandedNodes,
+      displayColumnByTarget
     );
   }, [
     graphData,
@@ -585,6 +620,7 @@ function SchemaMapInner() {
     columnsLoadedNodes,
     direction,
     highlightedRefField,
+    dotWalkExpandedNodes,
   ]);
 
   // -----------------------------------------------------------------------
