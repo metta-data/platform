@@ -14,7 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Light/dark mode toggle in the header and landing page (uses `next-themes` with system preference detection)
+- Light/dark mode toggle in the header and landing page (uses `next-themes`, defaults to light, persists user preference)
+- Dark mode uses a blue-slate tinted color palette instead of pure black for a more refined look
 - Populated all CSDM lifecycle domain tables from the CSDM 5 White Paper: Design & Planning (Business Capability, Business Application, Information Object), Build & Integration (SDLC Component), Service Delivery (14 tables including Service Instance, Application Service, Technology Mgmt Service, API, AI Function/Application, and more), Service Consumption (Business Service, Business Service Offering, Service Portfolio, Request Catalog)
 - Added Foundation domain tables: Contract (ast_contract), CMDB Group (cmdb_group)
 - Fixed Target table name to sn_gf_goal_target per CSDM 5 specification
