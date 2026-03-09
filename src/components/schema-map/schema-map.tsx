@@ -204,6 +204,17 @@ function SchemaMapInner() {
     new Set()
   );
 
+  // Column filter & show-all state
+  const [showAllGroups, setShowAllGroups] = useState<
+    Map<string, Set<string>>
+  >(new Map());
+  const [nodeColumnFilters, setNodeColumnFilters] = useState<
+    Map<string, string>
+  >(new Map());
+  const [dotWalkShowAll, setDotWalkShowAll] = useState<Set<string>>(
+    new Set()
+  );
+
   const abortRef = useRef<AbortController | null>(null);
 
   // Sync centerTable with selectedTable from tree
@@ -217,6 +228,9 @@ function SchemaMapInner() {
       setDotWalkExpandedNodes(new Set());
       setDotWalkColumns(new Map());
       setDotWalkLoadingNodes(new Set());
+      setShowAllGroups(new Map());
+      setNodeColumnFilters(new Map());
+      setDotWalkShowAll(new Set());
     }
   }, [selectedTable, centerTable]);
 
@@ -350,6 +364,44 @@ function SchemaMapInner() {
     [highlightedRefField, graphData, dotWalkExpandedNodes, handleToggleDotWalkExpand]
   );
 
+  const handleToggleShowAll = useCallback(
+    (nodeId: string, groupName: string) => {
+      setShowAllGroups((prev) => {
+        const next = new Map(prev);
+        const groups = new Set(next.get(nodeId) || []);
+        if (groups.has(groupName)) groups.delete(groupName);
+        else groups.add(groupName);
+        next.set(nodeId, groups);
+        return next;
+      });
+    },
+    []
+  );
+
+  const handleSetColumnFilter = useCallback(
+    (nodeId: string, filter: string) => {
+      setNodeColumnFilters((prev) => {
+        const next = new Map(prev);
+        if (filter) next.set(nodeId, filter);
+        else next.delete(nodeId);
+        return next;
+      });
+    },
+    []
+  );
+
+  const handleToggleDotWalkShowAll = useCallback(
+    (tableName: string) => {
+      setDotWalkShowAll((prev) => {
+        const next = new Set(prev);
+        if (next.has(tableName)) next.delete(tableName);
+        else next.add(tableName);
+        return next;
+      });
+    },
+    []
+  );
+
   const { toggleDotWalkField } = useExplorerStore();
 
   const handleToggleDotWalkField = useCallback(
@@ -370,6 +422,9 @@ function SchemaMapInner() {
       setDotWalkExpandedNodes(new Set());
       setDotWalkColumns(new Map());
       setDotWalkLoadingNodes(new Set());
+      setShowAllGroups(new Map());
+      setNodeColumnFilters(new Map());
+      setDotWalkShowAll(new Set());
     },
     [setSelectedTable]
   );
@@ -515,6 +570,12 @@ function SchemaMapInner() {
           expandedGroupNames:
             expandedGroups.get(n.name) || EMPTY_GROUP_NAMES,
           querySelectedFields: querySelectedFieldSet,
+          // Column filter & show-all props
+          columnFilter: nodeColumnFilters.get(n.name) || "",
+          onSetColumnFilter: handleSetColumnFilter,
+          showAllGroupNames:
+            showAllGroups.get(n.name) || EMPTY_GROUP_NAMES,
+          onToggleShowAll: handleToggleShowAll,
           // Dot-walk props for MiniNodes (use real name for state lookups)
           dotWalkExpanded: dotWalkExpandedNodes.has(realName),
           dotWalkColumns: dotWalkColumns.get(realName) || [],
@@ -524,6 +585,8 @@ function SchemaMapInner() {
           displayColumn: n.displayColumn || null,
           onToggleDotWalkExpand: handleToggleDotWalkExpand,
           onToggleDotWalkField: handleToggleDotWalkField,
+          showAllDotWalk: dotWalkShowAll.has(realName),
+          onToggleDotWalkShowAll: handleToggleDotWalkShowAll,
         },
       };
     });
@@ -572,6 +635,12 @@ function SchemaMapInner() {
     dotWalkLoadingNodes,
     handleToggleDotWalkExpand,
     handleToggleDotWalkField,
+    showAllGroups,
+    nodeColumnFilters,
+    dotWalkShowAll,
+    handleToggleShowAll,
+    handleSetColumnFilter,
+    handleToggleDotWalkShowAll,
   ]);
 
   // Fit view when new graph data loads or view mode changes
@@ -663,6 +732,9 @@ function SchemaMapInner() {
       setDotWalkExpandedNodes(new Set());
       setDotWalkColumns(new Map());
       setDotWalkLoadingNodes(new Set());
+      setShowAllGroups(new Map());
+      setNodeColumnFilters(new Map());
+      setDotWalkShowAll(new Set());
     },
     [setSelectedTable]
   );

@@ -6,6 +6,7 @@ import {
   GROUP_HEADER_H,
   GROUP_PAD,
   FIELD_ROW_H,
+  FILTER_INPUT_H,
   MAX_VISIBLE_ROWS,
 } from "./constants";
 
@@ -32,10 +33,21 @@ function getNodeDimensions(node: Node) {
   // Expanded MiniNode: add height for dot-walk column list
   if (isDotWalkExpanded) {
     const cols = node.data?.dotWalkColumns as { element: string }[] | undefined;
-    const colCount = cols ? Math.min(cols.length, MAX_DOT_WALK_ROWS) : 0;
+    const dotWalkFilter = (node.data?.columnFilter as string) || "";
+    const showAllDotWalk = !!(node.data?.showAllDotWalk);
+
+    let colCount: number;
+    if (dotWalkFilter || showAllDotWalk) {
+      // When filtering or showing all, use full column count (overestimate for filter)
+      colCount = cols ? cols.length : 0;
+    } else {
+      colCount = cols ? Math.min(cols.length, MAX_DOT_WALK_ROWS) : 0;
+    }
+
     if (colCount > 0) {
-      height += 1 + GROUP_PAD * 2 + colCount * FIELD_ROW_H; // border-t + padding + rows
-      if (cols && cols.length > MAX_DOT_WALK_ROWS) {
+      // border-t + filter input + padding + rows
+      height += 1 + FILTER_INPUT_H + GROUP_PAD * 2 + colCount * FIELD_ROW_H;
+      if (cols && cols.length > MAX_DOT_WALK_ROWS && !dotWalkFilter) {
         height += FIELD_ROW_H; // "+N more..." row
       }
     } else {
@@ -55,24 +67,38 @@ function getNodeDimensions(node: Node) {
       const expandedGroupNames =
         (node.data.expandedGroupNames as Set<string> | undefined) ||
         new Set<string>();
+      const showAllGroupNames =
+        (node.data.showAllGroupNames as Set<string> | undefined) ||
+        new Set<string>();
+      const columnFilter = (node.data.columnFilter as string) || "";
 
       if (ancestorOwnCounts && ancestorOwnCounts.length > 0) {
+        // Add filter input height
+        height += FILTER_INPUT_H;
+
         // Precise calculation: we know each group's column count
         for (const group of ancestorOwnCounts) {
           height += GROUP_HEADER_H;
           if (expandedGroupNames.has(group.name)) {
-            const visibleRows = Math.min(
-              group.ownColumnCount,
-              MAX_VISIBLE_ROWS
-            );
+            let visibleRows: number;
+            if (columnFilter || showAllGroupNames.has(group.name)) {
+              // When filtering or showing all, use full count (overestimate for filter is OK)
+              visibleRows = group.ownColumnCount;
+            } else {
+              visibleRows = Math.min(
+                group.ownColumnCount,
+                MAX_VISIBLE_ROWS
+              );
+            }
             height += GROUP_PAD * 2 + visibleRows * FIELD_ROW_H;
-            if (group.ownColumnCount > MAX_VISIBLE_ROWS) {
-              height += FIELD_ROW_H; // "+N more..." row
+            if (group.ownColumnCount > MAX_VISIBLE_ROWS && !columnFilter) {
+              height += FIELD_ROW_H; // "+N more..." / "Show fewer" row
             }
           }
         }
       } else {
         // Fallback: no ancestor data yet, rough estimate
+        height += FILTER_INPUT_H;
         const ownCols = (node.data.columnCount as number) || 0;
         const totalCols = (node.data.totalColumnCount as number) || 0;
         const numGroups =
@@ -88,7 +114,7 @@ function getNodeDimensions(node: Node) {
     } else {
       // Non-center nodes have a 400px max-height scroll container.
       const totalCols = (node.data.totalColumnCount as number) || 0;
-      height += Math.min(totalCols * FIELD_ROW_H + 16, 400);
+      height += Math.min(totalCols * FIELD_ROW_H + FILTER_INPUT_H + 16, 400);
     }
   }
 

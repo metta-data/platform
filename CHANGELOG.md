@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Column search/filter in the Detail View — filter own and inherited columns by name or label with live results
+- Column search/filter in Schema Map nodes — compact filter input inside expanded TableNode and MiniNode for quick column lookup
+- Expandable hidden columns in Schema Map — "+N more…" indicators are now clickable to reveal all columns, with "Show fewer" to collapse back
 - Light/dark mode toggle in the header and landing page (uses `next-themes`, defaults to light, persists user preference)
 - Dark mode uses a blue-slate tinted color palette instead of pure black for a more refined look
 - Populated all CSDM lifecycle domain tables from the CSDM 5 White Paper: Design & Planning (Business Capability, Business Application, Information Object), Build & Integration (SDLC Component), Service Delivery (14 tables including Service Instance, Application Service, Technology Mgmt Service, API, AI Function/Application, and more), Service Consumption (Business Service, Business Service Offering, Service Portfolio, Request Catalog)

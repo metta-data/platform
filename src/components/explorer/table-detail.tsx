@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Search, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -21,6 +23,17 @@ import { useExplorerStore } from "@/stores/explorer-store";
 import { TYPE_COLORS } from "@/lib/constants";
 import type { TableDetail as TableDetailType, ColumnDetail } from "@/types";
 
+function matchesColumnFilter(
+  col: { element: string; label: string },
+  query: string
+): boolean {
+  if (!query) return true;
+  const q = query.toLowerCase();
+  return (
+    col.element.toLowerCase().includes(q) || col.label.toLowerCase().includes(q)
+  );
+}
+
 interface TableDetailProps {
   tableName: string;
   onNavigateTable: (tableName: string) => void;
@@ -35,6 +48,12 @@ export function TableDetailView({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showInherited, setShowInherited] = useState(true);
+  const [columnFilter, setColumnFilter] = useState("");
+
+  // Reset filter when table changes
+  useEffect(() => {
+    setColumnFilter("");
+  }, [tableName]);
 
   useEffect(() => {
     if (!selectedSnapshotId || !tableName) return;
@@ -179,13 +198,52 @@ export function TableDetailView({
 
       <Separator className="my-4" />
 
-      {/* Own columns */}
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold mb-3">
-          Own Columns ({ownColumns.length})
-        </h3>
-        <ColumnTable columns={ownColumns} onNavigateTable={onNavigateTable} />
+      {/* Column filter */}
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+        <Input
+          type="search"
+          placeholder="Filter columns by name or label..."
+          className="pl-9 pr-9 h-9"
+          value={columnFilter}
+          onChange={(e) => setColumnFilter(e.target.value)}
+        />
+        {columnFilter && (
+          <button
+            onClick={() => setColumnFilter("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <X className="size-4" />
+          </button>
+        )}
       </div>
+
+      {/* Own columns */}
+      {(() => {
+        const filtered = ownColumns.filter((c) =>
+          matchesColumnFilter(c, columnFilter)
+        );
+        return (
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-3">
+              Own Columns{" "}
+              {columnFilter
+                ? `(${filtered.length} of ${ownColumns.length})`
+                : `(${ownColumns.length})`}
+            </h3>
+            {filtered.length > 0 ? (
+              <ColumnTable
+                columns={filtered}
+                onNavigateTable={onNavigateTable}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No columns match &quot;{columnFilter}&quot;
+              </p>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Inherited columns */}
       {inheritedByTable.size > 0 && (
@@ -195,26 +253,34 @@ export function TableDetailView({
             Inherited Columns ({tableDetail.columns.length - ownColumns.length})
           </CollapsibleTrigger>
           <CollapsibleContent>
-            {Array.from(inheritedByTable.entries()).map(([source, columns]) => (
-              <div key={source} className="mb-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-sm text-muted-foreground">From</span>
-                  <button
-                    onClick={() => onNavigateTable(source)}
-                    className="text-sm text-primary hover:underline font-mono"
-                  >
-                    {tableLabelMap.get(source) || source}
-                  </button>
-                  <Badge variant="outline" className="text-xs">
-                    {columns.length}
-                  </Badge>
+            {Array.from(inheritedByTable.entries()).map(([source, columns]) => {
+              const filtered = columns.filter((c) =>
+                matchesColumnFilter(c, columnFilter)
+              );
+              if (columnFilter && filtered.length === 0) return null;
+              return (
+                <div key={source} className="mb-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-sm text-muted-foreground">From</span>
+                    <button
+                      onClick={() => onNavigateTable(source)}
+                      className="text-sm text-primary hover:underline font-mono"
+                    >
+                      {tableLabelMap.get(source) || source}
+                    </button>
+                    <Badge variant="outline" className="text-xs">
+                      {columnFilter
+                        ? `${filtered.length}/${columns.length}`
+                        : columns.length}
+                    </Badge>
+                  </div>
+                  <ColumnTable
+                    columns={filtered}
+                    onNavigateTable={onNavigateTable}
+                  />
                 </div>
-                <ColumnTable
-                  columns={columns}
-                  onNavigateTable={onNavigateTable}
-                />
-              </div>
-            ))}
+              );
+            })}
           </CollapsibleContent>
         </Collapsible>
       )}

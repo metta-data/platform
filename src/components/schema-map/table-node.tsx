@@ -11,6 +11,7 @@ import {
   Minus,
   Plus,
   Check,
+  Search,
 } from "lucide-react";
 import {
   HEADER_HEIGHT,
@@ -18,6 +19,7 @@ import {
   GROUP_HEADER_H,
   GROUP_PAD,
   FIELD_ROW_H,
+  FILTER_INPUT_H,
   MAX_VISIBLE_ROWS,
 } from "./constants";
 
@@ -30,6 +32,18 @@ function scopeColor(scope: string | null): string {
   }
   const hue = Math.abs(hash % 360);
   return `hsl(${hue}, 55%, 55%)`;
+}
+
+function matchesFilter(
+  col: { element: string; label: string },
+  query: string
+): boolean {
+  if (!query) return true;
+  const q = query.toLowerCase();
+  return (
+    col.element.toLowerCase().includes(q) ||
+    col.label.toLowerCase().includes(q)
+  );
 }
 
 interface ColumnInfo {
@@ -71,7 +85,28 @@ interface TableNodeData {
   highlightedRefField: string | null;
   expandedGroupNames: Set<string>;
   querySelectedFields: Set<string>;
+  columnFilter: string;
+  onSetColumnFilter: (nodeId: string, filter: string) => void;
+  showAllGroupNames: Set<string>;
+  onToggleShowAll: (nodeId: string, groupName: string) => void;
   [key: string]: unknown;
+}
+
+/** Get the visible columns for a group, accounting for filter and show-all state */
+function getVisibleColumns(
+  group: ColumnGroup,
+  filter: string,
+  showAll: boolean
+): ColumnInfo[] {
+  let cols = group.columns;
+  if (filter) {
+    cols = cols.filter((c) => matchesFilter(c, filter));
+  }
+  // When filtering or showing all, return everything; otherwise cap
+  if (!filter && !showAll) {
+    return cols.slice(0, MAX_VISIBLE_ROWS);
+  }
+  return cols;
 }
 
 function TableNodeComponent({ id, data }: NodeProps) {
@@ -82,6 +117,8 @@ function TableNodeComponent({ id, data }: NodeProps) {
 
   // Use lifted expandedGroupNames from parent (SchemaMap) instead of local state
   const expandedGroupNames = d.expandedGroupNames || new Set<string>();
+  const showAllGroupNames = d.showAllGroupNames || new Set<string>();
+  const columnFilter = d.columnFilter || "";
 
   // --- Pre-computed handle positions ---
   // Compute handle positions arithmetically from the column group structure
@@ -92,6 +129,9 @@ function TableNodeComponent({ id, data }: NodeProps) {
 
     const positions: { id: string; top: number }[] = [];
     let offset = HEADER_HEIGHT + BORDER_T;
+
+    // Account for filter input row
+    offset += FILTER_INPUT_H;
 
     for (const group of columnGroups) {
       // Group-level handle: only if group has reference columns
@@ -108,7 +148,8 @@ function TableNodeComponent({ id, data }: NodeProps) {
       if (expandedGroupNames.has(group.tableName)) {
         offset += GROUP_PAD; // top padding
 
-        const visibleCols = group.columns.slice(0, MAX_VISIBLE_ROWS);
+        const showAll = showAllGroupNames.has(group.tableName);
+        const visibleCols = getVisibleColumns(group, columnFilter, showAll);
         for (const col of visibleCols) {
           if (col.referenceTable) {
             positions.push({
@@ -119,8 +160,8 @@ function TableNodeComponent({ id, data }: NodeProps) {
           offset += FIELD_ROW_H;
         }
 
-        // "+N more..." row
-        if (group.columns.length > MAX_VISIBLE_ROWS) {
+        // "+N more" / "Show fewer" row (only when not filtering)
+        if (!columnFilter && group.columns.length > MAX_VISIBLE_ROWS) {
           offset += FIELD_ROW_H;
         }
 
@@ -129,7 +170,7 @@ function TableNodeComponent({ id, data }: NodeProps) {
     }
 
     return positions;
-  }, [d.expanded, columnGroups, expandedGroupNames]);
+  }, [d.expanded, columnGroups, expandedGroupNames, showAllGroupNames, columnFilter]);
 
   // Notify React Flow when handles change so edges re-connect
   useEffect(() => {
@@ -306,7 +347,7 @@ function TableNodeComponent({ id, data }: NodeProps) {
 
       {/* Expanded columns grouped by inheritance level */}
       {d.expanded && (
-        <div className={`border-t ${d.isCenter ? "" : "max-h-[400px] overflow-y-auto"}`}>
+        <div className={`border-t ${d.isCenter ? "" : "max-h-[400px] overflow-y-auto nowheel"}`}>
           {loadingColumns ? (
             <div className="text-xs text-muted-foreground py-2 px-3">
               Loading columns...
@@ -316,108 +357,155 @@ function TableNodeComponent({ id, data }: NodeProps) {
               No columns
             </div>
           ) : (
-            columnGroups.map((group) => {
-              const isExpanded = expandedGroupNames.has(group.tableName);
-              return (
-                <div key={group.tableName}>
-                  {/* Group header */}
-                  <button
-                    onClick={(e) => toggleGroup(group.tableName, e)}
-                    className={`
-                      w-full flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold
-                      border-b hover:bg-muted/50 transition-colors cursor-pointer
-                      ${group.isOwn ? "text-foreground" : "text-muted-foreground"}
-                    `}
-                    style={
-                      !group.isOwn
-                        ? { color: "hsl(var(--destructive))", opacity: 0.8 }
-                        : undefined
-                    }
-                  >
-                    {isExpanded ? (
-                      <Minus className="w-3 h-3 flex-shrink-0" />
-                    ) : (
-                      <Plus className="w-3 h-3 flex-shrink-0" />
-                    )}
-                    <span className={group.isOwn ? "" : "font-semibold"}>
-                      {group.isOwn ? "Columns" : `${group.tableLabel} Columns`}
-                    </span>
-                  </button>
+            <>
+              {/* Column filter input */}
+              <div className="px-2 py-1 border-b flex items-center gap-1">
+                <Search className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                <input
+                  type="text"
+                  className="nodrag nopan nowheel w-full text-[10px] px-1 py-0.5 rounded border bg-background placeholder:text-muted-foreground/60 outline-none focus:ring-1 focus:ring-ring/50"
+                  placeholder="Filter columns..."
+                  value={columnFilter}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    d.onSetColumnFilter(id, e.target.value);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
 
-                  {/* Column list */}
-                  {isExpanded && (
-                    <div
-                      className={`px-2 py-1 ${
-                        group.isOwn ? "" : "bg-amber-50/50 dark:bg-amber-950/10"
-                      }`}
+              {columnGroups.map((group) => {
+                const isExpanded = expandedGroupNames.has(group.tableName);
+                const showAll = showAllGroupNames.has(group.tableName);
+                const visibleCols = isExpanded
+                  ? getVisibleColumns(group, columnFilter, showAll)
+                  : [];
+                const hasOverflow =
+                  !columnFilter && group.columns.length > MAX_VISIBLE_ROWS;
+
+                return (
+                  <div key={group.tableName}>
+                    {/* Group header */}
+                    <button
+                      onClick={(e) => toggleGroup(group.tableName, e)}
+                      className={`
+                        w-full flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold
+                        border-b hover:bg-muted/50 transition-colors cursor-pointer
+                        ${group.isOwn ? "text-foreground" : "text-muted-foreground"}
+                      `}
+                      style={
+                        !group.isOwn
+                          ? { color: "hsl(var(--destructive))", opacity: 0.8 }
+                          : undefined
+                      }
                     >
-                      <ul className="space-y-0">
-                        {group.columns.slice(0, MAX_VISIBLE_ROWS).map((col) => {
-                          const isRef = col.referenceTable != null;
-                          const isHighlighted = isRef && d.highlightedRefField === col.element;
-                          const isQuerySelected = d.querySelectedFields?.has(col.element);
-                          return (
-                            <li
-                              key={col.element}
-                              onClick={(e: React.MouseEvent) => {
-                                e.stopPropagation();
-                                // For reference fields, also trigger edge highlighting
-                                if (isRef) {
-                                  d.onFieldClick(id, col.element);
-                                }
-                                // Always toggle query field selection
-                                d.onToggleQueryField(col);
-                              }}
-                              className={`
-                                flex items-center justify-between gap-2 text-xs py-0.5 px-1 rounded cursor-pointer
-                                ${isQuerySelected
-                                  ? "bg-emerald-100 dark:bg-emerald-900/40 ring-1 ring-emerald-400/50"
-                                  : isHighlighted
-                                    ? "bg-blue-100 dark:bg-blue-900/40 ring-1 ring-blue-400/50"
-                                    : isRef
-                                      ? "hover:bg-blue-50 dark:hover:bg-blue-950/30"
-                                      : "hover:bg-muted/50"
-                                }
-                              `}
-                            >
-                              <span className="flex items-center gap-1 truncate min-w-0">
-                                {isQuerySelected && (
-                                  <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
-                                )}
-                                <span className="truncate">
-                                  {col.label || col.element}:
+                      {isExpanded ? (
+                        <Minus className="w-3 h-3 flex-shrink-0" />
+                      ) : (
+                        <Plus className="w-3 h-3 flex-shrink-0" />
+                      )}
+                      <span className={group.isOwn ? "" : "font-semibold"}>
+                        {group.isOwn ? "Columns" : `${group.tableLabel} Columns`}
+                      </span>
+                    </button>
+
+                    {/* Column list */}
+                    {isExpanded && (
+                      <div
+                        className={`px-2 py-1 ${
+                          group.isOwn ? "" : "bg-amber-50/50 dark:bg-amber-950/10"
+                        }`}
+                      >
+                        <ul className="space-y-0">
+                          {visibleCols.map((col) => {
+                            const isRef = col.referenceTable != null;
+                            const isHighlighted = isRef && d.highlightedRefField === col.element;
+                            const isQuerySelected = d.querySelectedFields?.has(col.element);
+                            return (
+                              <li
+                                key={col.element}
+                                onClick={(e: React.MouseEvent) => {
+                                  e.stopPropagation();
+                                  // For reference fields, also trigger edge highlighting
+                                  if (isRef) {
+                                    d.onFieldClick(id, col.element);
+                                  }
+                                  // Always toggle query field selection
+                                  d.onToggleQueryField(col);
+                                }}
+                                className={`
+                                  flex items-center justify-between gap-2 text-xs py-0.5 px-1 rounded cursor-pointer
+                                  ${isQuerySelected
+                                    ? "bg-emerald-100 dark:bg-emerald-900/40 ring-1 ring-emerald-400/50"
+                                    : isHighlighted
+                                      ? "bg-blue-100 dark:bg-blue-900/40 ring-1 ring-blue-400/50"
+                                      : isRef
+                                        ? "hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                                        : "hover:bg-muted/50"
+                                  }
+                                `}
+                              >
+                                <span className="flex items-center gap-1 truncate min-w-0">
+                                  {isQuerySelected && (
+                                    <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                                  )}
+                                  <span className="truncate">
+                                    {col.label || col.element}:
+                                  </span>
                                 </span>
-                              </span>
-                              <span className="flex items-center gap-1 flex-shrink-0 text-muted-foreground">
-                                {isRef ? (
-                                  <span className={`text-[10px] flex items-center gap-0.5 ${
-                                    isHighlighted
-                                      ? "text-blue-700 dark:text-blue-300 font-semibold"
-                                      : "text-blue-600 dark:text-blue-400"
-                                  }`}>
-                                    reference
-                                    <ArrowUpRight className="w-2.5 h-2.5" />
-                                  </span>
-                                ) : (
-                                  <span className="text-[10px]">
-                                    {col.internalType}
-                                  </span>
-                                )}
-                              </span>
+                                <span className="flex items-center gap-1 flex-shrink-0 text-muted-foreground">
+                                  {isRef ? (
+                                    <span className={`text-[10px] flex items-center gap-0.5 ${
+                                      isHighlighted
+                                        ? "text-blue-700 dark:text-blue-300 font-semibold"
+                                        : "text-blue-600 dark:text-blue-400"
+                                    }`}>
+                                      reference
+                                      <ArrowUpRight className="w-2.5 h-2.5" />
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px]">
+                                      {col.internalType}
+                                    </span>
+                                  )}
+                                </span>
+                              </li>
+                            );
+                          })}
+                          {columnFilter && visibleCols.length === 0 && (
+                            <li className="text-[10px] text-muted-foreground py-0.5 px-1">
+                              No matches
                             </li>
-                          );
-                        })}
-                        {group.columns.length > MAX_VISIBLE_ROWS && (
-                          <li className="text-[10px] text-muted-foreground py-0.5 px-1">
-                            +{group.columns.length - MAX_VISIBLE_ROWS} more...
-                          </li>
-                        )}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              );
-            })
+                          )}
+                          {hasOverflow && !showAll && (
+                            <li
+                              className="text-[10px] text-blue-600 dark:text-blue-400 py-0.5 px-1 cursor-pointer hover:underline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                d.onToggleShowAll(id, group.tableName);
+                              }}
+                            >
+                              +{group.columns.length - MAX_VISIBLE_ROWS} more…
+                            </li>
+                          )}
+                          {hasOverflow && showAll && (
+                            <li
+                              className="text-[10px] text-blue-600 dark:text-blue-400 py-0.5 px-1 cursor-pointer hover:underline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                d.onToggleShowAll(id, group.tableName);
+                              }}
+                            >
+                              Show fewer
+                            </li>
+                          )}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </>
           )}
         </div>
       )}
