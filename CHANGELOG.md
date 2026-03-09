@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Populated all CSDM lifecycle domain tables from the CSDM 5 White Paper: Design & Planning (Business Capability, Business Application, Information Object), Build & Integration (SDLC Component), Service Delivery (14 tables including Service Instance, Application Service, Technology Mgmt Service, API, AI Function/Application, and more), Service Consumption (Business Service, Business Service Offering, Service Portfolio, Request Catalog)
+- Added Foundation domain tables: Contract (ast_contract), CMDB Group (cmdb_group)
+- Fixed Target table name to sn_gf_goal_target per CSDM 5 specification
+- CSDM table card deep-links now force detail view mode in Schema Explorer (previously could land on map view if it was last active)
 - CSDM (Common Service Data Model) interactive view at `/csdm` with lifecycle chevron navigation
 - CSDM domain table listing with clickable cards linking to Schema Explorer
 - CSDM Foundation row showing cross-cutting foundational tables

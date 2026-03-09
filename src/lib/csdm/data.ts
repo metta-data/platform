@@ -5,10 +5,10 @@
 // The CSDM is ServiceNow's standard framework for organizing
 // service-related data across the platform lifecycle.
 //
-// Table mappings will be provided by the user from official
-// ServiceNow CSDM reference images. Placeholder entries are
-// populated from the Ideation & Strategy and Foundation domains.
-// Other domains have skeleton structures ready to fill in.
+// Table mappings are sourced from the CSDM 5 White Paper.
+// All seven domains are populated: Foundation, Ideation & Strategy,
+// Design & Planning, Build & Integration, Service Delivery,
+// Service Consumption, and Manage Portfolio.
 
 // ----- Types -----
 
@@ -43,7 +43,7 @@ export interface CsdmLifecycle {
 
 /**
  * The five lifecycle phases rendered as chevrons.
- * Tables populated from ServiceNow CSDM reference images.
+ * Tables populated from the CSDM 5 White Paper.
  */
 export const CSDM_LIFECYCLE: CsdmLifecycle = {
   id: "manage-portfolio",
@@ -60,43 +60,61 @@ export const CSDM_LIFECYCLE: CsdmLifecycle = {
         { name: "sn_gf_plan", label: "Strategic Plan" },
         { name: "sn_gf_strategy", label: "Strategic Priority" },
         { name: "sn_gf_goal", label: "Goal" },
-        { name: "sn_gf_target", label: "Target" },
+        { name: "sn_gf_goal_target", label: "Target" },
       ],
     },
     {
       id: "design-planning",
       label: "Design & Planning",
       description:
-        "Architect services and plan implementations for the portfolio.",
+        "Architect services and plan implementations using Enterprise Architecture tables for business capabilities, applications, and information objects.",
       tables: [
-        // TODO: User to provide tables from CSDM reference image
+        { name: "cmdb_ci_business_capability", label: "Business Capability" },
+        { name: "cmdb_ci_business_app", label: "Business Application" },
+        { name: "cmdb_ci_information_object", label: "Information Object" },
       ],
     },
     {
       id: "build-integration",
       label: "Build & Integration",
       description:
-        "Build, configure, test, and deploy services and their components.",
+        "Build, configure, test, and integrate digital products including DevOps pipelines and SDLC components.",
       tables: [
-        // TODO: User to provide tables from CSDM reference image
+        { name: "cmdb_ci_sdlc_component", label: "SDLC Component" },
       ],
     },
     {
       id: "service-delivery",
       label: "Service Delivery",
       description:
-        "Deliver and operate services for the organization.",
+        "Deliver and operate the end-to-end service delivery system including infrastructure, service instances, and technology management services.",
       tables: [
-        // TODO: User to provide tables from CSDM reference image
+        { name: "cmdb_ci_service_auto", label: "Service Instance" },
+        { name: "cmdb_ci_service_discovered", label: "Application Service" },
+        { name: "cmdb_ci_service_technical", label: "Technology Mgmt Service" },
+        { name: "service_offering", label: "Tech Mgmt Service Offering" },
+        { name: "cmdb_ci_query_based_service", label: "Dynamic CI Group" },
+        { name: "cmdb_ci_api", label: "API" },
+        { name: "cmdb_ci_appl", label: "Application" },
+        { name: "cmdb_ci_function_ai", label: "AI Function" },
+        { name: "cmdb_ci_appl_ai_application", label: "AI Application" },
+        { name: "cmdb_ci_data_service_instance", label: "Data Service Instance" },
+        { name: "cmdb_ci_connection_service_instance", label: "Connection Service Instance" },
+        { name: "cmdb_ci_network_service_instance", label: "Network Service Instance" },
+        { name: "cmdb_ci_facility_service_instance", label: "Facility Service Instance" },
+        { name: "cmdb_ci_operational_process_service_instance", label: "Operational Process Service Instance" },
       ],
     },
     {
       id: "service-consumption",
       label: "Service Consumption",
       description:
-        "End-user consumption, requests, and experience with services.",
+        "Business services consumed by end-users and customers, managed through Service Portfolio Management and Customer Service Management.",
       tables: [
-        // TODO: User to provide tables from CSDM reference image
+        { name: "cmdb_ci_service_business", label: "Business Service" },
+        { name: "service_offering", label: "Business Service Offering" },
+        { name: "service_portfolio", label: "Service Portfolio" },
+        { name: "sc_catalog", label: "Request Catalog" },
       ],
     },
   ],
@@ -110,12 +128,14 @@ export const CSDM_FOUNDATION: CsdmDomain = {
   id: "foundation",
   label: "Foundation",
   description:
-    "Cross-cutting foundational data shared across all lifecycle phases, including value streams, business processes, and product models.",
+    "Cross-cutting foundational data shared across all lifecycle phases, including value streams, business processes, product models, contracts, and CMDB groups.",
   tables: [
     { name: "cmn_value_stream", label: "Value Stream" },
     { name: "cmn_value_stream_stage", label: "Value Stream Stage" },
     { name: "cmdb_ci_business_process", label: "Business Process" },
+    { name: "ast_contract", label: "Contract" },
     { name: "cmdb_model", label: "Product Model" },
+    { name: "cmdb_group", label: "CMDB Group" },
   ],
 };
 

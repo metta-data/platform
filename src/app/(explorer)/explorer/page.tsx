@@ -35,11 +35,13 @@ function ExplorerPageInner() {
     { name: string; label: string; count: number }[]
   >([]);
 
-  // Deep-link: if ?table= query param is present, select that table on mount
+  // Deep-link: if ?table= query param is present, select that table and
+  // ensure detail view mode so the table detail panel is visible
   useEffect(() => {
     const tableParam = searchParams.get("table");
     if (tableParam && tableParam !== selectedTable) {
       setSelectedTable(tableParam);
+      setViewMode("detail");
     }
     // Only run on mount / when searchParams change
     // eslint-disable-next-line react-hooks/exhaustive-deps
