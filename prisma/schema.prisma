@@ -191,6 +191,8 @@ model User {
   catalogEntries   CatalogEntry[]
   validatedEntries CatalogEntry[] @relation("ValidatedBy")
   fieldAudits      CatalogFieldAudit[]
+  glossaryCreated  GlossaryTerm[] @relation("GlossaryCreatedBy")
+  glossaryUpdated  GlossaryTerm[] @relation("GlossaryUpdatedBy")
   createdAt        DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")
 
@@ -316,4 +318,29 @@ model CatalogEntryTag {
   @@index([catalogEntryId])
   @@index([tagId])
   @@map("catalog_entry_tags")
+}
+
+// ============================================
+// Glossary
+// ============================================
+
+model GlossaryTerm {
+  id            String   @id @default(cuid())
+  term          String   @unique
+  definition    String
+  category      String?                           // "CSDM Concept", "ServiceNow Concept", "General"
+  relatedTables String[] @map("related_tables")   // ServiceNow table names
+  csdmDomainId  String?  @map("csdm_domain_id")   // matches CsdmDomain.id slug
+
+  createdById   String?  @map("created_by_id")
+  createdBy     User?    @relation("GlossaryCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById   String?  @map("updated_by_id")
+  updatedBy     User?    @relation("GlossaryUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@index([csdmDomainId])
+  @@map("glossary_terms")
 }

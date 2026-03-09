@@ -19,6 +19,8 @@ const publicNavItems = [
   { href: "/explorer", label: "Explorer" },
   { href: "/compare", label: "Compare" },
   { href: "/catalog", label: "Catalog" },
+  { href: "/csdm", label: "CSDM" },
+  { href: "/glossary", label: "Glossary" },
 ];
 
 /** Only rendered when auth is enabled (inside SessionProvider) */

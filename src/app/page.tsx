@@ -13,12 +13,18 @@ export default function Home() {
           application scopes. Understand table inheritance, view column details,
           and diff your instance against out-of-the-box baselines.
         </p>
-        <div className="flex gap-4">
+        <div className="flex flex-wrap justify-center gap-4">
           <Button asChild size="lg">
             <Link href="/explorer">Explore Schemas</Link>
           </Button>
           <Button asChild variant="outline" size="lg">
             <Link href="/compare">Compare Schemas</Link>
+          </Button>
+          <Button asChild variant="outline" size="lg">
+            <Link href="/csdm">CSDM Lifecycle</Link>
+          </Button>
+          <Button asChild variant="outline" size="lg">
+            <Link href="/glossary">Glossary</Link>
           </Button>
         </div>
       </main>

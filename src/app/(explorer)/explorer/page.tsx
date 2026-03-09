@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { SchemaTree } from "@/components/explorer/schema-tree";
 import { TableDetailView } from "@/components/explorer/table-detail";
 import { VersionSelector } from "@/components/explorer/version-selector";
@@ -13,6 +14,15 @@ import { Table2, Map } from "lucide-react";
 import type { SnapshotSummary } from "@/types";
 
 export default function ExplorerPage() {
+  return (
+    <Suspense>
+      <ExplorerPageInner />
+    </Suspense>
+  );
+}
+
+function ExplorerPageInner() {
+  const searchParams = useSearchParams();
   const {
     selectedSnapshotId,
     selectedTable,
@@ -24,6 +34,16 @@ export default function ExplorerPage() {
   const [scopes, setScopes] = useState<
     { name: string; label: string; count: number }[]
   >([]);
+
+  // Deep-link: if ?table= query param is present, select that table on mount
+  useEffect(() => {
+    const tableParam = searchParams.get("table");
+    if (tableParam && tableParam !== selectedTable) {
+      setSelectedTable(tableParam);
+    }
+    // Only run on mount / when searchParams change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // Fetch available snapshots
   useEffect(() => {

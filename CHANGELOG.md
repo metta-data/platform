@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- CSDM (Common Service Data Model) interactive view at `/csdm` with lifecycle chevron navigation
+- CSDM domain table listing with clickable cards linking to Schema Explorer
+- CSDM Foundation row showing cross-cutting foundational tables
+- Deep-link support: CSDM table cards navigate to `/explorer?table=...` with table pre-selected
+- Glossary feature at `/glossary` for tracking ServiceNow and CSDM terminology
+- Glossary CRUD API (`/api/glossary`) with search and category filtering
+- Glossary terms support related tables, CSDM domain linking, and category tagging
+- Glossary tooltip component for showing definitions on hover (used on CSDM page)
+- GlossaryTerm database model with Prisma migration
+- CSDM and Glossary added to top-level navigation and landing page
+- Tooltip UI component (shadcn/ui) with TooltipProvider in root layout
 - Snowflake SQL query generator in the Schema Map query builder for ServiceNow data ingested via the native Snowflake connector
 - Snowflake locator input (DATABASE.SCHEMA) persisted to localStorage
 - Snowflake SQL uses `__VIEW` suffix per Snowflake connector naming convention
