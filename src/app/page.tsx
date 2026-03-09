@@ -8,7 +8,7 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
-import { Database, Snowflake, ArrowRight } from "lucide-react";
+import { Database, Snowflake, ArrowRight, Building2 } from "lucide-react";
 
 export default function Home() {
   return (
@@ -89,6 +89,38 @@ export default function Home() {
                   <div className="flex flex-wrap gap-1.5">
                     <Badge variant="secondary" className="text-xs opacity-50">Explorer</Badge>
                     <Badge variant="secondary" className="text-xs opacity-50">Compare</Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Enterprise — coming soon, spans full width */}
+            <div aria-disabled="true" className="sm:col-span-2">
+              <Card className="opacity-50 cursor-not-allowed">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex size-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                      <Building2 className="size-5" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-xl">Enterprise</CardTitle>
+                      <Badge variant="outline" className="text-[10px]">
+                        Coming Soon
+                      </Badge>
+                    </div>
+                  </div>
+                  <CardDescription className="mt-2">
+                    Explore data across the organization — data assets, data
+                    products, enterprise data model, and cross-platform
+                    lineage.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-1.5">
+                    <Badge variant="secondary" className="text-xs opacity-50">Data Assets</Badge>
+                    <Badge variant="secondary" className="text-xs opacity-50">Data Products</Badge>
+                    <Badge variant="secondary" className="text-xs opacity-50">Enterprise Data Model</Badge>
+                    <Badge variant="secondary" className="text-xs opacity-50">Lineage</Badge>
                   </div>
                 </CardContent>
               </Card>

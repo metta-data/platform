@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Rebranded from "Now Schema Explorer" to "Metadata Explorer" to reflect multi-platform direction
-- Landing page redesigned as a platform hub with cards for ServiceNow (active) and Snowflake (coming soon)
+- Landing page redesigned as a platform hub with cards for ServiceNow (active), Snowflake (coming soon), and Enterprise (coming soon — data assets, data products, enterprise data model, cross-platform lineage)
 
 ### Added
 
