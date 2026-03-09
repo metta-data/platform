@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Self-reference edges in Schema Map References view no longer disappear; they point to a synthetic ghost node so the relationship is visible
 - Glossary create/edit/delete buttons now hidden for viewers; only stewards and admins see mutation controls (API was already gated)
+- CSDM table cards, Foundation row, and Beta badge now render correctly in dark mode (replaced hardcoded light-only colors with dark: variants)
 - CSDM (Common Service Data Model) interactive view at `/csdm` with lifecycle chevron navigation
 - CSDM domain table listing with clickable cards linking to Schema Explorer
 - CSDM Foundation row showing cross-cutting foundational tables

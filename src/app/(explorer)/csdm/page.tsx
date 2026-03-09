@@ -44,7 +44,7 @@ function CsdmPageInner() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
             CSDM Service Lifecycle
-            <span className="ml-2 align-middle inline-block rounded-full bg-amber-100 text-amber-800 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5">
+            <span className="ml-2 align-middle inline-block rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5">
               Beta
             </span>
           </h1>

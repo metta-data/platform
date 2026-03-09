@@ -15,8 +15,8 @@ interface FoundationRowProps {
  */
 export function FoundationRow({ domain, snapshotTableNames }: FoundationRowProps) {
   return (
-    <div className="rounded-lg border bg-slate-50 p-4">
-      <div className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
+    <div className="rounded-lg border bg-slate-50 dark:bg-slate-900/50 p-4">
+      <div className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-3">
         {domain.label}
       </div>
       <div className="flex flex-wrap gap-3">

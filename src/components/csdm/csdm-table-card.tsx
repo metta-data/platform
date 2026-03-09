@@ -22,11 +22,11 @@ export function CsdmTableCard({ table, existsInSnapshot }: CsdmTableCardProps) {
       className={
         "group block rounded-lg border px-4 py-3 transition-all " +
         (available
-          ? "bg-amber-50 border-amber-200 hover:bg-amber-100 hover:border-amber-300 hover:shadow-sm cursor-pointer"
+          ? "bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/50 hover:bg-amber-100 dark:hover:bg-amber-900/40 hover:border-amber-300 dark:hover:border-amber-700/60 hover:shadow-sm cursor-pointer"
           : "bg-muted/50 border-muted cursor-default opacity-60")
       }
     >
-      <div className="font-semibold text-sm text-foreground group-hover:text-amber-900 transition-colors">
+      <div className="font-semibold text-sm text-foreground group-hover:text-amber-900 dark:group-hover:text-amber-200 transition-colors">
         {table.label}
       </div>
       <div className="text-xs text-muted-foreground font-mono mt-0.5">
