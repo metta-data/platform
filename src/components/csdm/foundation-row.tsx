@@ -11,7 +11,7 @@ interface FoundationRowProps {
 
 /**
  * Renders the CSDM Foundation row — a horizontal band of cross-cutting
- * foundational tables that span all lifecycle phases.
+ * foundational tables that span all domains.
  */
 export function FoundationRow({ domain, snapshotTableNames }: FoundationRowProps) {
   return (

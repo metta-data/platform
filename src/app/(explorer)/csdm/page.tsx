@@ -2,8 +2,8 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { CSDM_LIFECYCLE, CSDM_FOUNDATION } from "@/lib/csdm/data";
-import { LifecycleChevrons } from "@/components/csdm/lifecycle-chevrons";
+import { CSDM_DOMAINS, CSDM_FOUNDATION } from "@/lib/csdm/data";
+import { DomainChevrons } from "@/components/csdm/domain-chevrons";
 import { CsdmTableCard } from "@/components/csdm/csdm-table-card";
 import { FoundationRow } from "@/components/csdm/foundation-row";
 import { GlossaryTooltip } from "@/components/glossary/glossary-tooltip";
@@ -19,7 +19,7 @@ export default function CsdmPage() {
 function CsdmPageInner() {
   const searchParams = useSearchParams();
   const [activeDomainId, setActiveDomainId] = useState<string>(
-    CSDM_LIFECYCLE.domains[0].id
+    CSDM_DOMAINS.domains[0].id
   );
 
   // Support ?domain= query param for deep-linking from glossary
@@ -27,13 +27,13 @@ function CsdmPageInner() {
     const domainParam = searchParams.get("domain");
     if (
       domainParam &&
-      CSDM_LIFECYCLE.domains.some((d) => d.id === domainParam)
+      CSDM_DOMAINS.domains.some((d) => d.id === domainParam)
     ) {
       setActiveDomainId(domainParam);
     }
   }, [searchParams]);
 
-  const activeDomain = CSDM_LIFECYCLE.domains.find(
+  const activeDomain = CSDM_DOMAINS.domains.find(
     (d) => d.id === activeDomainId
   );
 
@@ -43,27 +43,27 @@ function CsdmPageInner() {
         {/* Page header */}
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            CSDM Service Lifecycle
+            CSDM Domains
             <span className="ml-2 align-middle inline-block rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5">
               Beta
             </span>
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Common Service Data Model — click a lifecycle phase to explore its
+            Common Service Data Model — click a domain to explore its
             tables, then click a table to open it in the Schema Explorer.
           </p>
         </div>
 
-        {/* Manage Portfolio label */}
+        {/* Domain container label */}
         <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
           <GlossaryTooltip definition="The overarching process of governing, prioritizing, and aligning the service portfolio to business strategy.">
-            {CSDM_LIFECYCLE.label}
+            {CSDM_DOMAINS.label}
           </GlossaryTooltip>
         </div>
 
-        {/* Lifecycle chevrons */}
-        <LifecycleChevrons
-          domains={CSDM_LIFECYCLE.domains}
+        {/* Domain chevrons */}
+        <DomainChevrons
+          domains={CSDM_DOMAINS.domains}
           activeDomainId={activeDomainId}
           onSelect={setActiveDomainId}
         />

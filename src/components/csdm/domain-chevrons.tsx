@@ -3,25 +3,25 @@
 import { cn } from "@/lib/utils";
 import type { CsdmDomain } from "@/lib/csdm/data";
 
-interface LifecycleChevronProps {
+interface DomainChevronProps {
   domains: CsdmDomain[];
   activeDomainId: string | null;
   onSelect: (domainId: string) => void;
 }
 
 /**
- * Horizontal row of chevron-shaped buttons representing the CSDM service lifecycle.
+ * Horizontal row of chevron-shaped buttons representing the CSDM domains.
  *
  * Each chevron is built with CSS clip-path:
  *  - First: flat left, arrow right
  *  - Middle: indented left, arrow right
  *  - Last: indented left, flat right
  */
-export function LifecycleChevrons({
+export function DomainChevrons({
   domains,
   activeDomainId,
   onSelect,
-}: LifecycleChevronProps) {
+}: DomainChevronProps) {
   return (
     <div className="flex items-stretch gap-1 overflow-x-auto">
       {domains.map((domain, index) => {

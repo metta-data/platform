@@ -3,7 +3,7 @@
 // ============================================
 //
 // The CSDM is ServiceNow's standard framework for organizing
-// service-related data across the platform lifecycle.
+// service-related data across its seven domains.
 //
 // Table mappings are sourced from the CSDM 5 White Paper.
 // All seven domains are populated: Foundation, Ideation & Strategy,
@@ -24,28 +24,28 @@ export interface CsdmDomain {
   id: string;
   /** Display name (e.g. "Ideation & Strategy") */
   label: string;
-  /** Short description of this lifecycle phase */
+  /** Short description of this domain */
   description: string;
   /** Tables belonging to this domain */
   tables: CsdmTable[];
 }
 
-export interface CsdmLifecycle {
+export interface CsdmDomainContainer {
   /** Slug identifier */
   id: string;
   /** Container label (e.g. "Manage Portfolio") */
   label: string;
-  /** The ordered lifecycle domains (left-to-right chevrons) */
+  /** The ordered CSDM domains (left-to-right chevrons) */
   domains: CsdmDomain[];
 }
 
 // ----- Data -----
 
 /**
- * The five lifecycle phases rendered as chevrons.
+ * The CSDM domains rendered as chevrons.
  * Tables populated from the CSDM 5 White Paper.
  */
-export const CSDM_LIFECYCLE: CsdmLifecycle = {
+export const CSDM_DOMAINS: CsdmDomainContainer = {
   id: "manage-portfolio",
   label: "Manage Portfolio",
   domains: [
@@ -121,14 +121,14 @@ export const CSDM_LIFECYCLE: CsdmLifecycle = {
 };
 
 /**
- * Foundation tables that span across all lifecycle phases.
+ * Foundation tables that span across all domains.
  * Rendered as a separate row at the bottom of the CSDM view.
  */
 export const CSDM_FOUNDATION: CsdmDomain = {
   id: "foundation",
   label: "Foundation",
   description:
-    "Cross-cutting foundational data shared across all lifecycle phases, including value streams, business processes, product models, contracts, and CMDB groups.",
+    "Cross-cutting foundational data shared across all domains, including value streams, business processes, product models, contracts, and CMDB groups.",
   tables: [
     { name: "cmn_value_stream", label: "Value Stream" },
     { name: "cmn_value_stream_stage", label: "Value Stream Stage" },
@@ -140,9 +140,9 @@ export const CSDM_FOUNDATION: CsdmDomain = {
 };
 
 /**
- * All CSDM domains (lifecycle + foundation) for lookups.
+ * All CSDM domains (including Foundation) for lookups.
  */
 export const ALL_CSDM_DOMAINS: CsdmDomain[] = [
-  ...CSDM_LIFECYCLE.domains,
+  ...CSDM_DOMAINS.domains,
   CSDM_FOUNDATION,
 ];
