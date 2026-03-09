@@ -46,6 +46,10 @@ export function TableDetailView({
       `/api/tables/${encodeURIComponent(tableName)}?snapshotId=${selectedSnapshotId}`
     )
       .then((res) => {
+        if (res.status === 404)
+          throw new Error(
+            `Table "${tableName}" was not found in this snapshot. It may belong to a plugin or application scope that is not active on this instance.`
+          );
         if (!res.ok) throw new Error("Failed to load table details");
         return res.json();
       })
@@ -70,7 +74,11 @@ export function TableDetailView({
 
   if (error) {
     return (
-      <div className="p-6 text-destructive">{error}</div>
+      <div className="p-6">
+        <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+          {error}
+        </div>
+      </div>
     );
   }
 
