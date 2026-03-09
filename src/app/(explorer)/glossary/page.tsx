@@ -47,6 +47,18 @@ export default function GlossaryPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingTerm, setEditingTerm] = useState<GlossaryTerm | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [canEdit, setCanEdit] = useState(false);
+
+  // Fetch session to determine edit permissions (steward or admin)
+  useEffect(() => {
+    fetch("/api/auth/session")
+      .then((r) => r.json())
+      .then((session) => {
+        const role = session?.user?.role;
+        setCanEdit(role === "STEWARD" || role === "ADMIN");
+      })
+      .catch(() => setCanEdit(false));
+  }, []);
 
   const fetchTerms = useCallback(async () => {
     try {
@@ -161,10 +173,12 @@ export default function GlossaryPage() {
               Definitions for ServiceNow, CSDM, and domain-specific terminology.
             </p>
           </div>
-          <Button onClick={() => setShowCreateDialog(true)}>
-            <Plus className="w-4 h-4 mr-1.5" />
-            Add Term
-          </Button>
+          {canEdit && (
+            <Button onClick={() => setShowCreateDialog(true)}>
+              <Plus className="w-4 h-4 mr-1.5" />
+              Add Term
+            </Button>
+          )}
         </div>
 
         {/* Search + Filter */}
@@ -205,7 +219,7 @@ export default function GlossaryPage() {
                 ? "No terms match your filters."
                 : "No glossary terms yet."}
             </p>
-            {!search && categoryFilter === ALL_CATEGORIES && (
+            {!search && categoryFilter === ALL_CATEGORIES && canEdit && (
               <Button
                 variant="outline"
                 size="sm"
@@ -250,24 +264,26 @@ export default function GlossaryPage() {
                               )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0"
-                              onClick={() => setEditingTerm(term)}
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                              onClick={() => handleDelete(term)}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
-                          </div>
+                          {canEdit && (
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                onClick={() => setEditingTerm(term)}
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                                onClick={() => handleDelete(term)}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </CardHeader>
                       <CardContent className="py-0 px-4 pb-3">
