@@ -75,10 +75,14 @@ function buildEdgesFromGraphData(
 
     // --- Reference edges ---
     const targetIsRefOnly = refTargetSet.has(e.target);
+    // Resolve real table name for self-ref ghost nodes
+    const realTarget = e.target.endsWith("__self-ref")
+      ? e.target.replace(/__self-ref$/, "")
+      : e.target;
     // If the target MiniNode is expanded and has a display column, pin to it
     const targetDisplayCol = displayColumnByTarget.get(e.target);
     const targetIsExpandedWithDisplay =
-      dotWalkExpandedTargets.has(e.target) && !!targetDisplayCol;
+      dotWalkExpandedTargets.has(realTarget) && !!targetDisplayCol;
     const targetHandle = targetIsExpandedWithDisplay
       ? "ref-target-display"
       : targetIsRefOnly
@@ -330,9 +334,13 @@ function SchemaMapInner() {
         for (const e of graphData.edges) {
           if (e.type === "reference" && e.fields) {
             for (const f of e.fields) {
-              if (f.element === newValue && !dotWalkExpandedNodes.has(e.target)) {
+              // Resolve real table name for self-ref ghost nodes
+              const realTarget = e.target.endsWith("__self-ref")
+                ? e.target.replace(/__self-ref$/, "")
+                : e.target;
+              if (f.element === newValue && !dotWalkExpandedNodes.has(realTarget)) {
                 // Trigger expansion of the target node
-                handleToggleDotWalkExpand(e.target);
+                handleToggleDotWalkExpand(realTarget);
               }
             }
           }
@@ -472,6 +480,10 @@ function SchemaMapInner() {
     const rfNodes: Node[] = visibleGraphNodes.map((n) => {
       const isMiniNode = !(n.isDetailed && !(showRefs && !n.isCenter));
       const parentRefElement = refTargetToParentField.get(n.name) || null;
+      // Self-ref ghost nodes have "__self-ref" suffix; use real table name for data
+      const realName = n.name.endsWith("__self-ref")
+        ? n.name.replace(/__self-ref$/, "")
+        : n.name;
 
       return {
         id: n.name,
@@ -479,7 +491,7 @@ function SchemaMapInner() {
         position: { x: 0, y: 0 },
         data: {
           label: n.label,
-          name: n.name,
+          name: realName,
           scopeName: n.scopeName,
           scopeLabel: n.scopeLabel,
           ownColumnCount: n.ownColumnCount,
@@ -503,11 +515,11 @@ function SchemaMapInner() {
           expandedGroupNames:
             expandedGroups.get(n.name) || EMPTY_GROUP_NAMES,
           querySelectedFields: querySelectedFieldSet,
-          // Dot-walk props for MiniNodes
-          dotWalkExpanded: dotWalkExpandedNodes.has(n.name),
-          dotWalkColumns: dotWalkColumns.get(n.name) || [],
-          dotWalkSelectedFields: dotWalkSelectedByTable.get(n.name) || EMPTY_GROUP_NAMES,
-          dotWalkLoading: dotWalkLoadingNodes.has(n.name),
+          // Dot-walk props for MiniNodes (use real name for state lookups)
+          dotWalkExpanded: dotWalkExpandedNodes.has(realName),
+          dotWalkColumns: dotWalkColumns.get(realName) || [],
+          dotWalkSelectedFields: dotWalkSelectedByTable.get(realName) || EMPTY_GROUP_NAMES,
+          dotWalkLoading: dotWalkLoadingNodes.has(realName),
           parentRefElement,
           displayColumn: n.displayColumn || null,
           onToggleDotWalkExpand: handleToggleDotWalkExpand,
@@ -629,7 +641,9 @@ function SchemaMapInner() {
 
   const handleNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
-      setSelectedTable(node.id);
+      // Use data.name (real table name) — self-ref ghost nodes have synthetic IDs
+      const tableName = (node.data as Record<string, unknown>)?.name as string || node.id;
+      setSelectedTable(tableName);
     },
     [setSelectedTable]
   );

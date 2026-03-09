@@ -161,6 +161,10 @@ export async function GET(request: Request) {
       { element: string; definedOnTable: string }[]
     >();
 
+    // Self-references use a synthetic ghost node so they render as a
+    // separate gray mini-node instead of being silently dropped.
+    const selfRefNodeId = `${centerTable}__self-ref`;
+
     for (const col of refColumns) {
       if (!col.referenceTable) continue;
 
@@ -170,15 +174,16 @@ export async function GET(request: Request) {
         : labelToName.get(col.referenceTable) || null;
 
       if (!refName) continue;
-      // Skip references to self
-      if (refName === centerTable) continue;
 
-      const existing = refsByTarget.get(refName) || [];
+      // Self-references point to a synthetic ghost node
+      const targetId = refName === centerTable ? selfRefNodeId : refName;
+
+      const existing = refsByTarget.get(targetId) || [];
       existing.push({
         element: col.element,
         definedOnTable: col.definedOnTable || centerTable,
       });
-      refsByTarget.set(refName, existing);
+      refsByTarget.set(targetId, existing);
     }
 
     // Create one edge per unique target, label with column count if multiple
@@ -197,7 +202,9 @@ export async function GET(request: Request) {
       });
 
       // Add the referenced table as a node if not already included
-      if (!nodeDistance.has(refName) && tableMap.has(refName)) {
+      const isSelfRef = refName === selfRefNodeId;
+      const realName = isSelfRef ? centerTable : refName;
+      if (!nodeDistance.has(refName) && tableMap.has(realName)) {
         nodeDistance.set(refName, depth + 1);
         referenceTargetNames.add(refName);
       }
@@ -205,7 +212,10 @@ export async function GET(request: Request) {
   }
 
   // Resolve display columns for all reference target tables
-  const refTargetTableNames = [...referenceTargetNames];
+  // Map synthetic self-ref IDs back to real table names for the query
+  const refTargetTableNames = [...referenceTargetNames].map((n) =>
+    n.endsWith("__self-ref") ? n.replace(/__self-ref$/, "") : n
+  );
   const displayColumnMap = refTargetTableNames.length > 0
     ? await resolveDisplayColumns(snapshotId, refTargetTableNames)
     : {};
@@ -217,16 +227,19 @@ export async function GET(request: Request) {
   const includedNames = new Set(nodeDistance.keys());
 
   for (const [name, distance] of nodeDistance) {
-    const t = tableMap.get(name);
+    // Synthetic self-ref ghost nodes use the center table's metadata
+    const isSelfRef = name.endsWith("__self-ref");
+    const realName = isSelfRef ? name.replace(/__self-ref$/, "") : name;
+    const t = tableMap.get(realName);
     if (!t) continue;
 
-    const totalChildren = (childrenMap.get(name) || []).length;
-    const includedChildren = (childrenMap.get(name) || []).filter((c) =>
+    const totalChildren = (childrenMap.get(realName) || []).length;
+    const includedChildren = (childrenMap.get(realName) || []).filter((c) =>
       includedNames.has(c)
     ).length;
 
     nodes.push({
-      name: t.name,
+      name,
       label: t.label,
       scopeName: t.scopeName,
       scopeLabel: t.scopeLabel,
@@ -234,13 +247,13 @@ export async function GET(request: Request) {
       totalColumnCount: t.totalColumnCount,
       childTableCount: t.childTableCount,
       isExtendable: t.isExtendable,
-      isCenter: t.name === centerTable,
-      isTruncated: includedChildren < totalChildren,
-      isDetailed: distance <= depth,
-      isReferenceTarget: referenceTargetNames.has(t.name),
+      isCenter: !isSelfRef && t.name === centerTable,
+      isTruncated: !isSelfRef && includedChildren < totalChildren,
+      isDetailed: !isSelfRef && distance <= depth,
+      isReferenceTarget: referenceTargetNames.has(name),
       ancestorOwnCounts:
-        t.name === centerTable ? ancestorOwnCounts : undefined,
-      displayColumn: displayColumnMap[t.name],
+        !isSelfRef && t.name === centerTable ? ancestorOwnCounts : undefined,
+      displayColumn: displayColumnMap[realName],
     });
   }
 
