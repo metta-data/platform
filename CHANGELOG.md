@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added Foundation domain tables: Contract (ast_contract), CMDB Group (cmdb_group)
 - Fixed Target table name to sn_gf_goal_target per CSDM 5 specification
 - CSDM table card deep-links now force detail view mode in Schema Explorer (previously could land on map view if it was last active)
+- Beta badge on CSDM page title
 - CSDM (Common Service Data Model) interactive view at `/csdm` with lifecycle chevron navigation
 - CSDM domain table listing with clickable cards linking to Schema Explorer
 - CSDM Foundation row showing cross-cutting foundational tables

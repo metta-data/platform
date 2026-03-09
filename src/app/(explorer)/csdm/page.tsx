@@ -44,6 +44,9 @@ function CsdmPageInner() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
             CSDM Service Lifecycle
+            <span className="ml-2 align-middle inline-block rounded-full bg-amber-100 text-amber-800 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5">
+              Beta
+            </span>
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             Common Service Data Model — click a lifecycle phase to explore its
