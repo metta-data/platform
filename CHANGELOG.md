@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Rebranded from "Now Schema Explorer" to "Metadata Explorer" to reflect multi-platform direction
+- Landing page redesigned as a platform hub with cards for ServiceNow (active) and Snowflake (coming soon)
+
 ### Added
 
+- Light/dark mode toggle in the header and landing page (uses `next-themes` with system preference detection)
 - Populated all CSDM lifecycle domain tables from the CSDM 5 White Paper: Design & Planning (Business Capability, Business Application, Information Object), Build & Integration (SDLC Component), Service Delivery (14 tables including Service Instance, Application Service, Technology Mgmt Service, API, AI Function/Application, and more), Service Consumption (Business Service, Business Service Offering, Service Portfolio, Request Catalog)
 - Added Foundation domain tables: Contract (ast_contract), CMDB Group (cmdb_group)
 - Fixed Target table name to sn_gf_goal_target per CSDM 5 specification

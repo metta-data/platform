@@ -12,6 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 
 const authEnabled = process.env.NEXT_PUBLIC_AUTH_ENABLED === "true";
 
@@ -47,6 +48,7 @@ function AuthControls() {
       ))}
 
       <div className="ml-auto flex items-center gap-3">
+        <ThemeToggle />
         <VersionLabel />
         {status === "loading" ? (
           <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
@@ -121,7 +123,7 @@ export function Header() {
     <header className="border-b bg-background">
       <div className="flex h-14 items-center px-6">
         <Link href="/" className="mr-8 flex items-center gap-2 font-semibold">
-          <span className="text-lg">Now Schema Explorer</span>
+          <span className="text-lg">Metadata Explorer</span>
         </Link>
         <nav className="flex items-center gap-1">
           {publicNavItems.map((item) => (
@@ -144,6 +146,7 @@ export function Header() {
           <AuthControls />
         ) : (
           <div className="ml-auto flex items-center gap-3">
+            <ThemeToggle />
             <VersionLabel />
           </div>
         )}
