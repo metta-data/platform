@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Schema Map reference edges now point to the correct display column on referenced tables instead of an inherited ancestor column (e.g. "Row" from sys_metadata); convention-based columns like `name` and `number` are now checked before walking up the inheritance chain
+
 ### Changed
 
 - Applied Mettadata Brand Color System to light and dark mode — replaced default shadcn gray palette with brand design tokens (Deep, Cobalt, Azure, Scarlet, Ice, Ink), secondary palette for data visualization (Teal, Violet, Amber, Sage, Slate), and semantic status colors
