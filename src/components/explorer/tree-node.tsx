@@ -23,7 +23,7 @@ export function TreeNodeRenderer({
     <div
       ref={dragHandle}
       style={style}
-      className={`flex items-center gap-1.5 px-2 cursor-pointer rounded-sm group
+      className={`flex items-center gap-1.5 pl-2 pr-5 cursor-pointer rounded-sm group
         ${node.isSelected ? "bg-accent" : "hover:bg-accent/50"}`}
       onClick={(e) => {
         e.stopPropagation();
