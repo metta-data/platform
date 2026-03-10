@@ -4,7 +4,7 @@ Project instructions for Claude Code. These are automatically loaded when workin
 
 ## Project Overview
 
-Now Schema Explorer is a Next.js application for exploring, comparing, and cataloging ServiceNow schemas. It supports schema ingestion via the ServiceNow Table API, interactive schema map visualization, a data catalog with AI-powered definition drafting, and role-based access control.
+Mettadata Platform is a Next.js application for exploring, comparing, and cataloging schemas across technology platforms. It supports schema ingestion via the ServiceNow Table API, interactive schema map visualization, a data catalog with AI-powered definition drafting, and role-based access control.
 
 ## Tech Stack
 
