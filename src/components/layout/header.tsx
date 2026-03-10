@@ -123,7 +123,7 @@ export function Header() {
     <header className="border-b bg-background">
       <div className="flex h-14 items-center px-6">
         <Link href="/" className="mr-8 flex items-center gap-2 font-semibold">
-          <span className="text-lg">Metadata Explorer</span>
+          <span className="text-lg">Mettadata Explorer</span>
         </Link>
         <nav className="flex items-center gap-1">
           {publicNavItems.map((item) => (

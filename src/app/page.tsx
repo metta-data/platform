@@ -23,7 +23,7 @@ export default function Home() {
         <div className="flex flex-col items-center gap-10 text-center">
           <div>
             <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-              Metadata Explorer
+              Mettadata Explorer
             </h1>
             <p className="mt-3 max-w-lg text-lg text-muted-foreground">
               Explore, compare, and catalog schemas across your technology

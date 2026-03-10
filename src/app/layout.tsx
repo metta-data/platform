@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Metadata Explorer",
+  title: "Mettadata Explorer",
   description: "Explore and compare schemas across platforms",
 };
 
