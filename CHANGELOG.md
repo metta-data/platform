@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Applied Mettadata Brand Color System to light and dark mode — replaced default shadcn gray palette with brand design tokens (Deep, Cobalt, Azure, Scarlet, Ice, Ink), secondary palette for data visualization (Teal, Violet, Amber, Sage, Slate), and semantic status colors
+- Switched typography from Geist to brand fonts: Playfair Display (display/headlines), DM Sans (body/UI), DM Mono (code/values)
+- Tag palette updated to use brand-aligned colors instead of default Tailwind palette
 - Rebranded to "Mettadata Platform" — header shows "Mettadata", landing page shows "Mettadata Platform"
 - Rebranded from "Now Schema Explorer" to "Metadata Explorer" to reflect multi-platform direction
 - Landing page redesigned as a platform hub with cards for ServiceNow (active), Snowflake (coming soon), and Enterprise (coming soon — data assets, data products, enterprise data model, cross-platform lineage)
