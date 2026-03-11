@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Snowflake query builder regression** — restored LEFT JOINs for reference fields that were incorrectly suppressed when the display column cache hadn't loaded yet; JOINs are now always emitted and display columns are added progressively once resolved
 - Schema Map reference edges now point to the correct display column on referenced tables instead of an inherited ancestor column (e.g. "Row" from sys_metadata); convention-based columns like `name` and `number` are now checked before walking up the inheritance chain
 
 ### Changed

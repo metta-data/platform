@@ -62,40 +62,34 @@ function buildSnowflakeSql(
     // ── Reference field → LEFT JOIN referenced table ──
     // Reference columns in Snowflake store JSON {"value":"<sys_id>", ...};
     // use PARSE_JSON to extract the GUID for the join condition.
-    // Only emit the JOIN when there are columns to SELECT from it
-    // (display column or explicit dot-walk fields).
+    // The JOIN is always emitted so the display column can be added
+    // progressively once the async displayColumnCache loads.
     if (isRef) {
       const refAlias = `ref_${field.element}`;
       const refView = `${field.referenceTable!.toUpperCase()}__VIEW`;
 
-      // Determine which columns we'd select from the joined table
-      const refSelectCols: string[] = [];
+      joins.push(
+        `LEFT JOIN ${prefix}${refView} ${refAlias}\n  ON PARSE_JSON(${q}${col}):value::STRING = ${refAlias}.SYS_ID`
+      );
 
-      // Auto-include the display value column from the referenced table
+      // Auto-include the display value column (once cache is loaded)
       const displayCol = displayColumnMap[field.referenceTable!];
       const alreadyDotWalked = displayCol && field.dotWalkFields.some(
         (dw) => dw.element.toLowerCase() === displayCol.toLowerCase()
       );
       if (displayCol && !alreadyDotWalked) {
-        refSelectCols.push(
+        selectCols.push(
           `${refAlias}.${displayCol.toUpperCase()} AS ${col}__DISPLAY`
         );
       }
 
+      // Explicit dot-walk fields
       if (field.dotWalkFields.length > 0) {
         for (const dw of field.dotWalkFields) {
-          refSelectCols.push(
+          selectCols.push(
             `${refAlias}.${dw.element.toUpperCase()} AS ${col}__${dw.element.toUpperCase()}`
           );
         }
-      }
-
-      // Only add the JOIN if we have columns to select from it
-      if (refSelectCols.length > 0) {
-        joins.push(
-          `LEFT JOIN ${prefix}${refView} ${refAlias}\n  ON PARSE_JSON(${q}${col}):value::STRING = ${refAlias}.SYS_ID`
-        );
-        selectCols.push(...refSelectCols);
       }
     } else if (isRefType) {
       // Reference type but target table unknown — hint only
