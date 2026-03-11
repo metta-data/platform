@@ -52,6 +52,32 @@ This project follows [Semantic Versioning](https://semver.org/) and maintains a 
 
 5. **Planned features** — Items in the `[Unreleased]` section may include planned work that is not yet implemented. Keep this section current as plans evolve.
 
+## GitHub Issues
+
+All features and bugs are tracked as GitHub Issues. This provides a searchable history of what was built, what broke, and how it was resolved.
+
+**When making changes, always:**
+
+1. **Create a GitHub Issue for every feature or bug** — before or during implementation. Use a clear title and include a Summary section describing the problem or feature.
+
+2. **Apply labels** — use `bug` or `enhancement` plus an area label:
+   - `area: catalog` — Data Catalog features
+   - `area: explorer` — Schema Explorer & Map features
+   - `area: query-builder` — SQL query builder (ServiceNow & Snowflake)
+   - `area: ingestion` — ServiceNow data ingestion
+   - `area: auth` — Authentication & authorization
+
+3. **Reference issues in commits** — use `Fixes #N` or `Resolves #N` in commit messages to auto-close issues.
+
+4. **Close issues when resolved** — include the commit hash in the issue body for traceability.
+
+**CLI quick reference:**
+```bash
+gh issue create --title "..." --label "bug" --label "area: catalog" --body "..."
+gh issue close N --reason completed
+gh issue list --state open
+```
+
 ## Auth & Roles
 
 - `ADMIN` — Full access, manages instances/snapshots/users/models
