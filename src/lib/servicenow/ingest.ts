@@ -125,22 +125,35 @@ export async function ingestFromInstance(
     //   1. Direct table name match (reference.value IS a table name)
     //   2. sys_id lookup (reference.value is a sys_db_object sys_id)
     //   3. Label lookup (reference.display_value is the table label)
+    //   4. Case-insensitive label match (handles ServiceNow returning
+    //      wrong-case values like "user" where the label is "User")
     const labelToName = new Map(parsedTables.map((t) => [t.label, t.name]));
-    let refTotal = 0, resolvedByName = 0, resolvedBySysId = 0, resolvedByLabel = 0, unresolved = 0;
+    const lowerLabelToName = new Map<string, string>();
+    for (const t of parsedTables) {
+      const lower = t.label.toLowerCase();
+      if (!lowerLabelToName.has(lower)) {
+        lowerLabelToName.set(lower, t.name);
+      }
+    }
+    let refTotal = 0, resolvedByName = 0, resolvedBySysId = 0, resolvedByLabel = 0, resolvedByLabelCI = 0, unresolved = 0;
     for (const col of parsedColumns) {
       if (col.referenceTableSysId) {
         refTotal++;
         const byName = tableNameSet.has(col.referenceTableSysId) ? col.referenceTableSysId : null;
         const bySysId = !byName ? sysIdToName.get(col.referenceTableSysId) : null;
         const byLabel = !byName && !bySysId ? (labelToName.get(col.referenceTableLabel ?? "") ?? null) : null;
-        col.referenceTable = byName ?? bySysId ?? byLabel ?? null;
+        const byLabelCI = !byName && !bySysId && !byLabel
+          ? (lowerLabelToName.get((col.referenceTableLabel ?? "").toLowerCase()) ?? null)
+          : null;
+        col.referenceTable = byName ?? bySysId ?? byLabel ?? byLabelCI ?? null;
         if (byName) resolvedByName++;
         else if (bySysId) resolvedBySysId++;
         else if (byLabel) resolvedByLabel++;
+        else if (byLabelCI) resolvedByLabelCI++;
         else unresolved++;
       }
     }
-    console.log(`[ingest] Reference resolution: ${refTotal} reference fields → ${resolvedByName} by name, ${resolvedBySysId} by sys_id, ${resolvedByLabel} by label, ${unresolved} unresolved`);
+    console.log(`[ingest] Reference resolution: ${refTotal} reference fields → ${resolvedByName} by name, ${resolvedBySysId} by sys_id, ${resolvedByLabel} by label, ${resolvedByLabelCI} by label (CI), ${unresolved} unresolved`);
 
     // Insert columns in batches, linked to their defining table
     let insertedCount = 0;

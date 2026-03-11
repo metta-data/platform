@@ -107,45 +107,6 @@ export async function GET(
     }
   );
 
-  // Normalize referenceTable values — some snapshots may have stale data
-  // (e.g. "user" instead of "sys_user") from older ingestions where the
-  // reference resolution chain didn't resolve correctly.  Validate each
-  // column's referenceTable against known table names and fall back to
-  // label-based resolution when it doesn't match.
-  const hasRefs = dedupedColumns.some((c) => c.referenceTable);
-  let normalizedColumns = dedupedColumns;
-
-  if (hasRefs) {
-    const allTables = await prisma.snapshotTable.findMany({
-      where: { snapshotId },
-      select: { name: true, label: true },
-    });
-    const tableNameSet = new Set(allTables.map((t) => t.name));
-    const labelToName = new Map<string, string>();
-    for (const t of allTables) {
-      if (!labelToName.has(t.label)) {
-        labelToName.set(t.label, t.name);
-      }
-    }
-
-    normalizedColumns = dedupedColumns.map((col) => {
-      if (!col.referenceTable) return col;
-      if (tableNameSet.has(col.referenceTable)) return col;
-      // Try label-based resolution — the stored value may be a label or
-      // lowercased label (e.g. "user" for label "User" → table "sys_user")
-      const byLabel =
-        labelToName.get(col.referenceTable) ??
-        labelToName.get(
-          col.referenceTable.charAt(0).toUpperCase() +
-            col.referenceTable.slice(1)
-        );
-      if (byLabel) {
-        return { ...col, referenceTable: byLabel };
-      }
-      return col;
-    });
-  }
-
   return NextResponse.json({
     name: table.name,
     label: table.label,
@@ -157,7 +118,7 @@ export async function GET(
     ownColumnCount: table.ownColumnCount,
     totalColumnCount: table.totalColumnCount,
     childTableCount: table.childTableCount,
-    columns: normalizedColumns,
+    columns: dedupedColumns,
     inheritanceChain,
     childTables: childTables.map((t) => t.name),
   });

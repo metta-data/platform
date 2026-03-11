@@ -42,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Snowflake SQL wrong reference table name** — reference table names stored from older ingestions (e.g. `user` instead of `sys_user`) are now normalized at the API layer via label-based resolution, producing correct Snowflake view names like `SYS_USER__VIEW`
+- **Snowflake SQL reference resolution** — reverted API-layer normalization that incorrectly resolved `imp_user` as `IMP_USER__VIEW` via label collision; added case-insensitive label matching (Step 4) to the ingestion and repair-references resolution chains as a defensive improvement for edge-case ServiceNow instances
 - **Snowflake query builder regression** — restored LEFT JOINs for reference fields that were incorrectly suppressed when the display column cache hadn't loaded yet; JOINs are now always emitted and display columns are added progressively once resolved
 - Schema Map reference edges now point to the correct display column on referenced tables instead of an inherited ancestor column (e.g. "Row" from sys_metadata); convention-based columns like `name` and `number` are now checked before walking up the inheritance chain
 

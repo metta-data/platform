@@ -50,9 +50,14 @@ export async function POST(
   const tableNameSet = new Set(allTables.map((t) => t.name));
   const sysIdToName = new Map(allTables.map((t) => [t.sysId, t.name]));
   const labelToName = new Map<string, string>();
+  const lowerLabelToName = new Map<string, string>();
   for (const t of allTables) {
     if (!labelToName.has(t.label)) {
       labelToName.set(t.label, t.name);
+    }
+    const lower = t.label.toLowerCase();
+    if (!lowerLabelToName.has(lower)) {
+      lowerLabelToName.set(lower, t.name);
     }
   }
 
@@ -65,14 +70,16 @@ export async function POST(
 
   const refFields = await client.fetchReferenceFields();
 
-  // Resolve each reference to a table name using the same 3-step chain as ingestion:
+  // Resolve each reference to a table name using the same 4-step chain as ingestion:
   //   1. Direct table name match (reference.value IS a table name)
   //   2. sys_id lookup (reference.value is a sys_db_object sys_id)
   //   3. Label lookup (reference.display_value is the table label)
+  //   4. Case-insensitive label lookup (handles wrong-case values like "user" → "User")
   const refMap = new Map<string, string>();
   let resolvedByName = 0;
   let resolvedBySysId = 0;
   let resolvedByLabel = 0;
+  let resolvedByLabelCI = 0;
   let unresolvedCount = 0;
   const unresolvedSamples: { tableName: string; element: string; refSysId: string; refLabel: string }[] = [];
 
@@ -80,13 +87,17 @@ export async function POST(
     const byName = tableNameSet.has(ref.refSysId) ? ref.refSysId : null;
     const bySysId = !byName ? sysIdToName.get(ref.refSysId) : null;
     const byLabel = !byName && !bySysId ? (labelToName.get(ref.refLabel) ?? null) : null;
-    const resolved = byName ?? bySysId ?? byLabel ?? null;
+    const byLabelCI = !byName && !bySysId && !byLabel
+      ? (lowerLabelToName.get(ref.refLabel.toLowerCase()) ?? null)
+      : null;
+    const resolved = byName ?? bySysId ?? byLabel ?? byLabelCI ?? null;
 
     if (resolved) {
       refMap.set(`${ref.tableName}:${ref.element}`, resolved);
       if (byName) resolvedByName++;
       else if (bySysId) resolvedBySysId++;
-      else resolvedByLabel++;
+      else if (byLabel) resolvedByLabel++;
+      else resolvedByLabelCI++;
     } else {
       unresolvedCount++;
       if (unresolvedSamples.length < 5) {
@@ -102,6 +113,7 @@ export async function POST(
   console.log(`[repair-references]   Resolved by name: ${resolvedByName}`);
   console.log(`[repair-references]   Resolved by sys_id: ${resolvedBySysId}`);
   console.log(`[repair-references]   Resolved by label: ${resolvedByLabel}`);
+  console.log(`[repair-references]   Resolved by label (CI): ${resolvedByLabelCI}`);
   console.log(`[repair-references]   Unresolved: ${unresolvedCount}`);
   if (unresolvedSamples.length > 0) {
     console.log(`[repair-references]   Unresolved samples:`, JSON.stringify(unresolvedSamples, null, 2));
@@ -150,6 +162,7 @@ export async function POST(
     resolvedByName,
     resolvedBySysId,
     resolvedByLabel,
+    resolvedByLabelCI,
     unresolved: unresolvedCount,
     columnsChecked: columnsToUpdate.length,
     columnsUpdated: updatedCount,
