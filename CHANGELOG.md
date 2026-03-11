@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Data Classification & Sensitivity Labels** — classify catalog entries by sensitivity level (Public, Internal, Confidential, PII, PHI, PCI) with color-coded badges, severity ordering, and justification tracking
+  - Classification badges on catalog entry rows and detail view
+  - Classification filter dropdown in catalog list
+  - Classification selector (multi-select popover) for stewards to assign/remove classifications
+  - Admin page for managing classification levels (create, edit, delete custom levels; system levels protected)
+  - Classification audit trail entries
+  - API routes: `GET/POST /api/classifications`, `PATCH/DELETE /api/classifications/[id]`, `PATCH /api/catalog/[tableName]/[element]/classify`
+- **Deprecation & Supersession** — mark catalog entries as deprecated with optional deprecation notes and links to superseding entries
+  - Deprecation badge on catalog entry rows (with `opacity-60` styling for deprecated rows)
+  - Deprecation banner in detail sheet with clickable link to superseding entry
+  - Deprecation dialog with note input and searchable entry picker for supersession
+  - Deprecation status filter (All / Active only / Deprecated only) in catalog list
+  - Reverse supersession links ("Supersedes" list) shown on entries that replace deprecated ones
+  - Deprecation fields audited via existing field audit trail
+- **Comments & Discussion Threads** — collaborative threaded discussions on catalog entries
+  - Comments tab in catalog detail sheet with count badge
+  - Comment posting for authenticated users, one-level-deep threading with replies
+  - Comment editing and deletion (own comments or admin)
+  - Thread resolution and pinning for stewards and admins
+  - Resolved threads collapsed by default with expand toggle
+  - Comment count indicator on catalog entry rows
+  - API routes: `GET/POST /api/catalog/[tableName]/[element]/comments`, `PATCH/DELETE /api/catalog/comments/[commentId]`, `PATCH /api/catalog/comments/[commentId]/resolve`, `PATCH /api/catalog/comments/[commentId]/pin`
+- Classifications card added to admin dashboard with entry count and undefined indicator
+- `classifiedCount` and `deprecatedCount` added to catalog stats API
+
 ### Fixed
 
 - Schema Map reference edges now point to the correct display column on referenced tables instead of an inherited ancestor column (e.g. "Row" from sys_metadata); convention-based columns like `name` and `number` are now checked before walking up the inheritance chain

@@ -9,6 +9,8 @@ export async function GET() {
     tableNames,
     validatedCount,
     draftWithDefinitionCount,
+    classifiedCount,
+    deprecatedCount,
   ] = await Promise.all([
     prisma.catalogEntry.count(),
     prisma.catalogEntry.count({
@@ -30,6 +32,12 @@ export async function GET() {
         definition: { not: null },
       },
     }),
+    prisma.catalogEntry.count({
+      where: { classifications: { some: {} } },
+    }),
+    prisma.catalogEntry.count({
+      where: { isDeprecated: true },
+    }),
   ]);
 
   return NextResponse.json({
@@ -40,5 +48,7 @@ export async function GET() {
     tableCount: tableNames.length,
     validatedCount,
     draftWithDefinitionCount,
+    classifiedCount,
+    deprecatedCount,
   });
 }

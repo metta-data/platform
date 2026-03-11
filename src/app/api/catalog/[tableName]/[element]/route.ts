@@ -42,6 +42,21 @@ export async function GET(
           tag: { select: { id: true, name: true, color: true, tagType: true } },
         },
       },
+      classifications: {
+        include: {
+          classificationLevel: true,
+          classifiedBy: { select: { id: true, username: true, displayName: true } },
+        },
+      },
+      deprecatedBy: {
+        select: { id: true, username: true, displayName: true },
+      },
+      supersededBy: {
+        select: { id: true, tableName: true, element: true, label: true },
+      },
+      supersedes: {
+        select: { id: true, tableName: true, element: true, label: true },
+      },
     },
   });
 
@@ -112,6 +127,19 @@ export async function GET(
       validatedBy: entry.validatedBy,
       steward: entry.steward,
       tags: entry.tags.map((t) => t.tag),
+      classifications: entry.classifications.map((c) => ({
+        id: c.id,
+        classificationLevel: c.classificationLevel,
+        classifiedBy: c.classifiedBy,
+        justification: c.justification,
+        classifiedAt: c.classifiedAt,
+      })),
+      isDeprecated: entry.isDeprecated,
+      deprecatedAt: entry.deprecatedAt,
+      deprecatedBy: entry.deprecatedBy,
+      deprecationNote: entry.deprecationNote,
+      supersededBy: entry.supersededBy,
+      supersedes: entry.supersedes,
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
     },
@@ -141,7 +169,7 @@ export async function PATCH(
   const decodedElement = decodeURIComponent(element);
 
   const body = await request.json();
-  const { definition, stewardId, validationStatus, definitionSource, definitionSourceDetail, citationUrl, aiConfidence } = body;
+  const { definition, stewardId, validationStatus, definitionSource, definitionSourceDetail, citationUrl, aiConfidence, isDeprecated, deprecationNote, supersededById } = body;
 
   const entry = await prisma.catalogEntry.findUnique({
     where: {
@@ -185,6 +213,26 @@ export async function PATCH(
 
   if (stewardId !== undefined) {
     updateData.stewardId = stewardId || null;
+  }
+
+  // Handle deprecation
+  if (isDeprecated !== undefined) {
+    updateData.isDeprecated = isDeprecated;
+    if (isDeprecated) {
+      updateData.deprecatedAt = new Date();
+      updateData.deprecatedById = userId || null;
+      if (deprecationNote !== undefined) {
+        updateData.deprecationNote = deprecationNote || null;
+      }
+      if (supersededById !== undefined) {
+        updateData.supersededById = supersededById || null;
+      }
+    } else {
+      updateData.deprecatedAt = null;
+      updateData.deprecatedById = null;
+      updateData.deprecationNote = null;
+      updateData.supersededById = null;
+    }
   }
 
   // Allow explicit validation status override (e.g., single-entry validate)

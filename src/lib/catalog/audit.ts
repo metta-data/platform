@@ -31,6 +31,9 @@ const AUDITED_FIELDS = [
   "stewardId",
   "label",
   "internalType",
+  "isDeprecated",
+  "deprecationNote",
+  "supersededById",
 ] as const;
 
 /** Map field names to readable labels for display */
@@ -44,6 +47,10 @@ export const FIELD_LABELS: Record<string, string> = {
   label: "label",
   internalType: "type",
   tags: "tags",
+  isDeprecated: "deprecated",
+  deprecationNote: "deprecation note",
+  supersededById: "superseded by",
+  classification: "classification",
 };
 
 /**

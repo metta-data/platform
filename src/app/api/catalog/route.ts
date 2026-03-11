@@ -81,6 +81,22 @@ export async function GET(request: Request) {
     }
   }
 
+  // Classification filter
+  const classification = searchParams.get("classification");
+  if (classification) {
+    where.classifications = {
+      some: { classificationLevelId: classification },
+    };
+  }
+
+  // Deprecation filter
+  const deprecated = searchParams.get("deprecated");
+  if (deprecated === "true") {
+    where.isDeprecated = true;
+  } else if (deprecated === "false") {
+    where.isDeprecated = false;
+  }
+
   const [entries, total] = await Promise.all([
     prisma.catalogEntry.findMany({
       where,
@@ -93,6 +109,17 @@ export async function GET(request: Request) {
             tag: { select: { id: true, name: true, color: true, tagType: true } },
           },
         },
+        classifications: {
+          include: {
+            classificationLevel: {
+              select: { id: true, name: true, color: true, severity: true },
+            },
+          },
+        },
+        supersededBy: {
+          select: { tableName: true, element: true, label: true },
+        },
+        _count: { select: { comments: true } },
       },
       orderBy: [{ tableName: "asc" }, { element: "asc" }],
       skip,

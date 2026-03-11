@@ -32,12 +32,26 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TYPE_COLORS } from "@/lib/constants";
 import { TagBadge, TagOverflow } from "@/components/catalog/tag-badge";
 import { TagSelector } from "@/components/catalog/tag-selector";
+import { ClassificationBadge, ClassificationOverflow } from "@/components/catalog/classification-badge";
+import { ClassificationSelector } from "@/components/catalog/classification-selector";
+import { DeprecationBadge } from "@/components/catalog/deprecation-badge";
+import { DeprecationDialog } from "@/components/catalog/deprecation-dialog";
+import { CatalogComments } from "@/components/catalog/catalog-comments";
 
 interface TagInfo {
   id: string;
   name: string;
   color: string;
   tagType: "AUTO" | "USER";
+}
+
+interface ClassificationInfo {
+  classificationLevel: {
+    id: string;
+    name: string;
+    color: string;
+    severity: number;
+  };
 }
 
 interface CatalogEntrySummary {
@@ -51,6 +65,10 @@ interface CatalogEntrySummary {
   validationStatus: string;
   steward: { id: string; username: string; displayName: string | null } | null;
   tags?: { tag: TagInfo }[];
+  classifications?: ClassificationInfo[];
+  isDeprecated?: boolean;
+  supersededBy?: { tableName: string; element: string; label: string } | null;
+  _count?: { comments: number };
   createdAt: string;
   updatedAt: string;
 }
@@ -66,6 +84,25 @@ interface CatalogEntryDetail {
       displayName: string | null;
     } | null;
     tags: TagInfo[];
+    classifications: {
+      id: string;
+      classificationLevel: {
+        id: string;
+        name: string;
+        color: string;
+        severity: number;
+        description: string | null;
+      };
+      classifiedBy: { id: string; username: string; displayName: string | null };
+      justification: string | null;
+      classifiedAt: string;
+    }[];
+    isDeprecated: boolean;
+    deprecatedAt: string | null;
+    deprecatedBy: { id: string; username: string; displayName: string | null } | null;
+    deprecationNote: string | null;
+    supersededBy: { id: string; tableName: string; element: string; label: string } | null;
+    supersedes: { id: string; tableName: string; element: string; label: string }[];
   };
   sourceSnapshot: { id: string; label: string; createdAt: string };
   linkedSnapshots: {
@@ -94,6 +131,8 @@ interface CatalogStats {
   tableCount: number;
   validatedCount: number;
   draftWithDefinitionCount: number;
+  classifiedCount: number;
+  deprecatedCount: number;
 }
 
 interface Pagination {
@@ -124,6 +163,8 @@ export default function CatalogPage() {
   const [validatedFilter, setValidatedFilter] = useState<string>("");
   const [sourceFilter, setSourceFilter] = useState<string>("");
   const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [classificationFilter, setClassificationFilter] = useState<string>("");
+  const [deprecatedFilter, setDeprecatedFilter] = useState<string>("");
   const [page, setPage] = useState(1);
 
   // Detail sheet
@@ -165,6 +206,10 @@ export default function CatalogPage() {
   const [tableNames, setTableNames] = useState<string[]>([]);
   const [fieldTypes, setFieldTypes] = useState<string[]>([]);
   const [allTags, setAllTags] = useState<TagInfo[]>([]);
+  const [allClassifications, setAllClassifications] = useState<{ id: string; name: string; color: string; severity: number }[]>([]);
+
+  // Deprecation dialog
+  const [deprecateDialogOpen, setDeprecateDialogOpen] = useState(false);
 
   // Fetch user session to determine edit permissions
   const [canEdit, setCanEdit] = useState(false);
@@ -207,6 +252,12 @@ export default function CatalogPage() {
         if (Array.isArray(tags)) setAllTags(tags);
       })
       .catch(() => {});
+    fetch("/api/classifications")
+      .then((r) => r.json())
+      .then((levels) => {
+        if (Array.isArray(levels)) setAllClassifications(levels);
+      })
+      .catch(() => {});
   }, []);
 
   // Fetch entries
@@ -220,6 +271,8 @@ export default function CatalogPage() {
     if (validatedFilter) params.set("validated", validatedFilter);
     if (sourceFilter) params.set("source", sourceFilter);
     if (tagFilter.length > 0) params.set("tags", tagFilter.join(","));
+    if (classificationFilter) params.set("classification", classificationFilter);
+    if (deprecatedFilter) params.set("deprecated", deprecatedFilter);
     params.set("page", String(page));
     params.set("limit", "50");
 
@@ -231,7 +284,7 @@ export default function CatalogPage() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [search, tableFilter, typeFilter, definedFilter, validatedFilter, sourceFilter, tagFilter, page]);
+  }, [search, tableFilter, typeFilter, definedFilter, validatedFilter, sourceFilter, tagFilter, classificationFilter, deprecatedFilter, page]);
 
   useEffect(() => {
     fetchEntries();
@@ -753,6 +806,53 @@ export default function CatalogPage() {
             </SelectContent>
           </Select>
         )}
+        {allClassifications.length > 0 && (
+          <Select
+            value={classificationFilter}
+            onValueChange={(v) => {
+              setClassificationFilter(v === "__all__" ? "" : v);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="All classifications">
+                {classificationFilter
+                  ? allClassifications.find((c) => c.id === classificationFilter)?.name || "Classification"
+                  : "All classifications"}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All classifications</SelectItem>
+              {allClassifications.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  <span className="flex items-center gap-2">
+                    <span
+                      className="inline-block h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: c.color }}
+                    />
+                    {c.name}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        <Select
+          value={deprecatedFilter}
+          onValueChange={(v) => {
+            setDeprecatedFilter(v === "__all__" ? "" : v);
+            setPage(1);
+          }}
+        >
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="All entries" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">All entries</SelectItem>
+            <SelectItem value="false">Active only</SelectItem>
+            <SelectItem value="true">Deprecated only</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Bulk action bar */}
@@ -854,6 +954,7 @@ export default function CatalogPage() {
                   <TableHead className="w-[120px]">Type</TableHead>
                   <TableHead>Definition</TableHead>
                   <TableHead className="w-[80px]">Status</TableHead>
+                  <TableHead>Classification</TableHead>
                   <TableHead>Tags</TableHead>
                   <TableHead>Steward</TableHead>
                 </TableRow>
@@ -862,7 +963,7 @@ export default function CatalogPage() {
                 {entries.map((entry) => (
                   <TableRow
                     key={entry.id}
-                    className="cursor-pointer hover:bg-accent/50"
+                    className={`cursor-pointer hover:bg-accent/50 ${entry.isDeprecated ? "opacity-60" : ""}`}
                     onClick={() => openDetail(entry)}
                   >
                     {canEdit && (
@@ -879,7 +980,10 @@ export default function CatalogPage() {
                       {entry.tableName}
                     </TableCell>
                     <TableCell className="font-mono text-sm">
-                      {entry.element}
+                      <div className="flex items-center gap-1.5">
+                        {entry.element}
+                        {entry.isDeprecated && <DeprecationBadge />}
+                      </div>
                     </TableCell>
                     <TableCell className="text-sm">{entry.label}</TableCell>
                     <TableCell>
@@ -902,6 +1006,26 @@ export default function CatalogPage() {
                         sourceLabel(entry.definitionSource)}
                     </TableCell>
                     <TableCell>{validationBadge(entry)}</TableCell>
+                    <TableCell>
+                      {entry.classifications && entry.classifications.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {entry.classifications
+                            .sort((a, b) => b.classificationLevel.severity - a.classificationLevel.severity)
+                            .slice(0, 2)
+                            .map((c) => (
+                              <ClassificationBadge
+                                key={c.classificationLevel.id}
+                                name={c.classificationLevel.name}
+                                color={c.classificationLevel.color}
+                                severity={c.classificationLevel.severity}
+                              />
+                            ))}
+                          {entry.classifications.length > 2 && (
+                            <ClassificationOverflow count={entry.classifications.length - 2} />
+                          )}
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {entry.tags && entry.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1">
@@ -981,6 +1105,54 @@ export default function CatalogPage() {
                 </p>
               </SheetHeader>
 
+              {/* Deprecation banner */}
+              {detail?.entry.isDeprecated && (
+                <div className="mx-4 mt-2 rounded-md border border-red-300 bg-red-50 dark:bg-red-950/30 dark:border-red-800 p-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-red-700 dark:text-red-400">
+                    <DeprecationBadge />
+                  </div>
+                  {detail.entry.deprecationNote && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                      {detail.entry.deprecationNote}
+                    </p>
+                  )}
+                  {detail.entry.supersededBy && (
+                    <p className="mt-1 text-sm">
+                      <span className="text-muted-foreground">Use </span>
+                      <button
+                        className="font-mono text-primary hover:underline"
+                        onClick={() => {
+                          const sup = detail.entry.supersededBy!;
+                          const fake: CatalogEntrySummary = {
+                            id: sup.id,
+                            tableName: sup.tableName,
+                            element: sup.element,
+                            label: sup.label,
+                            internalType: "",
+                            definition: null,
+                            definitionSource: null,
+                            validationStatus: "",
+                            steward: null,
+                            createdAt: "",
+                            updatedAt: "",
+                          };
+                          openDetail(fake);
+                        }}
+                      >
+                        {detail.entry.supersededBy.tableName}.{detail.entry.supersededBy.element}
+                      </button>
+                      <span className="text-muted-foreground"> instead</span>
+                    </p>
+                  )}
+                  {detail.entry.deprecatedBy && detail.entry.deprecatedAt && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Deprecated by {detail.entry.deprecatedBy.displayName || detail.entry.deprecatedBy.username} on{" "}
+                      {new Date(detail.entry.deprecatedAt).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+              )}
+
               {detailLoading ? (
                 <div className="space-y-4 px-4 mt-2">
                   <Skeleton className="h-20 w-full" />
@@ -1000,6 +1172,14 @@ export default function CatalogPage() {
                     </TabsTrigger>
                     <TabsTrigger value="history" className="flex-1">
                       History
+                    </TabsTrigger>
+                    <TabsTrigger value="comments" className="flex-1">
+                      Comments
+                      {selectedEntry?._count?.comments ? (
+                        <Badge variant="secondary" className="ml-1 text-[10px] px-1 py-0">
+                          {selectedEntry._count.comments}
+                        </Badge>
+                      ) : null}
                     </TabsTrigger>
                   </TabsList>
 
@@ -1294,6 +1474,103 @@ export default function CatalogPage() {
                         )}
                       </div>
                     </div>
+
+                    {/* Classifications */}
+                    <div>
+                      <span className="text-sm font-medium">Classifications</span>
+                      <div className="mt-1">
+                        {canEdit ? (
+                          <ClassificationSelector
+                            assigned={detail.entry.classifications || []}
+                            onUpdate={async (addIds, removeIds) => {
+                              await fetch(
+                                `/api/catalog/${encodeURIComponent(detail.entry.tableName)}/${encodeURIComponent(detail.entry.element)}/classify`,
+                                {
+                                  method: "PATCH",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({
+                                    addClassificationIds: addIds.length > 0 ? addIds : undefined,
+                                    removeClassificationIds: removeIds.length > 0 ? removeIds : undefined,
+                                  }),
+                                }
+                              );
+                              // Refresh detail
+                              const res = await fetch(
+                                `/api/catalog/${encodeURIComponent(detail.entry.tableName)}/${encodeURIComponent(detail.entry.element)}`
+                              );
+                              const fresh = await res.json();
+                              setDetail(fresh);
+                              fetchEntries();
+                            }}
+                          />
+                        ) : detail.entry.classifications && detail.entry.classifications.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {detail.entry.classifications.map((c) => (
+                              <ClassificationBadge
+                                key={c.classificationLevel.id}
+                                name={c.classificationLevel.name}
+                                color={c.classificationLevel.color}
+                                severity={c.classificationLevel.severity}
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground italic">
+                            No classifications assigned
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Deprecation controls */}
+                    {canEdit && (
+                      <div>
+                        <span className="text-sm font-medium">Deprecation</span>
+                        <div className="mt-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className={detail.entry.isDeprecated ? "" : "text-destructive"}
+                            onClick={() => setDeprecateDialogOpen(true)}
+                          >
+                            {detail.entry.isDeprecated ? "Manage Deprecation" : "Deprecate"}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Supersedes (reverse) */}
+                    {detail.entry.supersedes && detail.entry.supersedes.length > 0 && (
+                      <div>
+                        <span className="text-sm font-medium">Supersedes</span>
+                        <div className="mt-1 space-y-1">
+                          {detail.entry.supersedes.map((old) => (
+                            <button
+                              key={old.id}
+                              className="block text-sm font-mono text-primary hover:underline"
+                              onClick={() => {
+                                const fake: CatalogEntrySummary = {
+                                  id: old.id,
+                                  tableName: old.tableName,
+                                  element: old.element,
+                                  label: old.label,
+                                  internalType: "",
+                                  definition: null,
+                                  definitionSource: null,
+                                  validationStatus: "",
+                                  steward: null,
+                                  createdAt: "",
+                                  updatedAt: "",
+                                };
+                                openDetail(fake);
+                              }}
+                            >
+                              {old.tableName}.{old.element}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </TabsContent>
 
                   <TabsContent value="inheritance" className="space-y-3">
@@ -1425,12 +1702,52 @@ export default function CatalogPage() {
                       </p>
                     )}
                   </TabsContent>
+
+                  {/* Comments Tab */}
+                  <TabsContent value="comments" className="space-y-3">
+                    <CatalogComments
+                      tableName={detail.entry.tableName}
+                      element={detail.entry.element}
+                      currentUserId={currentUserId || undefined}
+                      userRole={userRole || undefined}
+                    />
+                  </TabsContent>
                 </Tabs>
               ) : null}
             </>
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Deprecation Dialog */}
+      {detail && (
+        <DeprecationDialog
+          open={deprecateDialogOpen}
+          onOpenChange={setDeprecateDialogOpen}
+          entryTableName={detail.entry.tableName}
+          entryElement={detail.entry.element}
+          isDeprecated={detail.entry.isDeprecated || false}
+          currentNote={detail.entry.deprecationNote || null}
+          currentSupersededBy={detail.entry.supersededBy || null}
+          onSubmit={async (data) => {
+            const res = await fetch(
+              `/api/catalog/${encodeURIComponent(detail.entry.tableName)}/${encodeURIComponent(detail.entry.element)}`,
+              {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+              }
+            );
+            if (!res.ok) throw new Error("Failed to update deprecation");
+            // Refresh detail
+            const detailRes = await fetch(
+              `/api/catalog/${encodeURIComponent(detail.entry.tableName)}/${encodeURIComponent(detail.entry.element)}`
+            );
+            if (detailRes.ok) setDetail(await detailRes.json());
+            fetchEntries();
+          }}
+        />
+      )}
     </div>
   );
 }

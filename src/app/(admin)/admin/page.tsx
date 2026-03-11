@@ -198,6 +198,20 @@ export default function AdminPage() {
             </Button>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Classifications</CardTitle>
+            <CardDescription>
+              Manage data sensitivity and compliance labels
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild>
+              <Link href="/admin/classifications">Manage Classifications</Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

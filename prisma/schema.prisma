@@ -193,6 +193,10 @@ model User {
   fieldAudits      CatalogFieldAudit[]
   glossaryCreated  GlossaryTerm[] @relation("GlossaryCreatedBy")
   glossaryUpdated  GlossaryTerm[] @relation("GlossaryUpdatedBy")
+  classifications      CatalogEntryClassification[] @relation("ClassifiedBy")
+  deprecatedEntries    CatalogEntry[]               @relation("DeprecatedBy")
+  comments             CatalogComment[]             @relation("CommentAuthor")
+  resolvedComments     CatalogComment[]             @relation("CommentResolvedBy")
   createdAt        DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")
 
@@ -236,6 +240,19 @@ model CatalogEntry {
   snapshots              CatalogEntrySnapshot[]
   fieldAudits            CatalogFieldAudit[]
   tags                   CatalogEntryTag[]
+  classifications        CatalogEntryClassification[]
+  comments               CatalogComment[]
+
+  // Deprecation & Supersession
+  isDeprecated           Boolean                @default(false) @map("is_deprecated")
+  deprecatedAt           DateTime?              @map("deprecated_at")
+  deprecatedById         String?                @map("deprecated_by_id")
+  deprecatedBy           User?                  @relation("DeprecatedBy", fields: [deprecatedById], references: [id], onDelete: SetNull)
+  deprecationNote        String?                @map("deprecation_note")
+  supersededById         String?                @map("superseded_by_id")
+  supersededBy           CatalogEntry?          @relation("Supersedes", fields: [supersededById], references: [id], onDelete: SetNull)
+  supersedes             CatalogEntry[]         @relation("Supersedes")
+
   createdAt              DateTime               @default(now()) @map("created_at")
   updatedAt              DateTime               @updatedAt @map("updated_at")
 
@@ -245,6 +262,7 @@ model CatalogEntry {
   @@index([stewardId])
   @@index([sourceSnapshotId])
   @@index([validationStatus])
+  @@index([isDeprecated])
   @@map("catalog_entries")
 }
 
@@ -318,6 +336,71 @@ model CatalogEntryTag {
   @@index([catalogEntryId])
   @@index([tagId])
   @@map("catalog_entry_tags")
+}
+
+// ============================================
+// Data Classification & Sensitivity Labels
+// ============================================
+
+model ClassificationLevel {
+  id          String                       @id @default(cuid())
+  name        String                       @unique
+  description String?
+  color       String                       @default("#6B7280")
+  severity    Int                          @default(0)
+  isSystem    Boolean                      @default(false) @map("is_system")
+  createdAt   DateTime                     @default(now()) @map("created_at")
+  updatedAt   DateTime                     @updatedAt @map("updated_at")
+
+  entries CatalogEntryClassification[]
+
+  @@index([severity])
+  @@map("classification_levels")
+}
+
+model CatalogEntryClassification {
+  id                    String              @id @default(cuid())
+  catalogEntryId        String              @map("catalog_entry_id")
+  catalogEntry          CatalogEntry        @relation(fields: [catalogEntryId], references: [id], onDelete: Cascade)
+  classificationLevelId String              @map("classification_level_id")
+  classificationLevel   ClassificationLevel @relation(fields: [classificationLevelId], references: [id], onDelete: Cascade)
+  classifiedById        String              @map("classified_by_id")
+  classifiedBy          User                @relation("ClassifiedBy", fields: [classifiedById], references: [id], onDelete: Cascade)
+  justification         String?
+  classifiedAt          DateTime            @default(now()) @map("classified_at")
+
+  @@unique([catalogEntryId, classificationLevelId])
+  @@index([catalogEntryId])
+  @@index([classificationLevelId])
+  @@map("catalog_entry_classifications")
+}
+
+// ============================================
+// Catalog Comments & Discussion Threads
+// ============================================
+
+model CatalogComment {
+  id              String           @id @default(cuid())
+  catalogEntryId  String           @map("catalog_entry_id")
+  catalogEntry    CatalogEntry     @relation(fields: [catalogEntryId], references: [id], onDelete: Cascade)
+  parentId        String?          @map("parent_id")
+  parent          CatalogComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies         CatalogComment[] @relation("CommentReplies")
+  authorId        String           @map("author_id")
+  author          User             @relation("CommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  body            String
+  isPinned        Boolean          @default(false) @map("is_pinned")
+  isResolved      Boolean          @default(false) @map("is_resolved")
+  resolvedById    String?          @map("resolved_by_id")
+  resolvedBy      User?            @relation("CommentResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+  resolvedAt      DateTime?        @map("resolved_at")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  @@index([catalogEntryId])
+  @@index([parentId])
+  @@index([authorId])
+  @@map("catalog_comments")
 }
 
 // ============================================
