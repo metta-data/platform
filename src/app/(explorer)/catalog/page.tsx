@@ -37,6 +37,7 @@ import { ClassificationSelector } from "@/components/catalog/classification-sele
 import { DeprecationBadge } from "@/components/catalog/deprecation-badge";
 import { DeprecationDialog } from "@/components/catalog/deprecation-dialog";
 import { CatalogComments } from "@/components/catalog/catalog-comments";
+import { ExplorerLink } from "@/components/explorer/explorer-link";
 
 interface TagInfo {
   id: string;
@@ -957,6 +958,7 @@ export default function CatalogPage() {
                   <TableHead>Classification</TableHead>
                   <TableHead>Tags</TableHead>
                   <TableHead>Steward</TableHead>
+                  <TableHead className="w-[40px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1043,6 +1045,13 @@ export default function CatalogPage() {
                         entry.steward?.username ||
                         "\u2014"}
                     </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <ExplorerLink
+                        tableName={entry.tableName}
+                        column={entry.element}
+                        variant="icon"
+                      />
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -1099,6 +1108,11 @@ export default function CatalogPage() {
                   >
                     {selectedEntry.internalType}
                   </Badge>
+                  <ExplorerLink
+                    tableName={selectedEntry.tableName}
+                    column={selectedEntry.element}
+                    variant="dropdown"
+                  />
                 </SheetTitle>
                 <p className="text-sm text-muted-foreground">
                   {selectedEntry.label}

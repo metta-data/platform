@@ -8,6 +8,7 @@ interface ExplorerState {
   scopeFilter: string | null;
   selectedTable: string | null;
   viewMode: "detail" | "map";
+  highlightedColumn: string | null;
 
   // Query builder state
   queryBuilderFields: SelectedField[];
@@ -23,6 +24,7 @@ interface ExplorerState {
   setScopeFilter: (scope: string | null) => void;
   setSelectedTable: (name: string | null) => void;
   setViewMode: (mode: "detail" | "map") => void;
+  setHighlightedColumn: (column: string | null) => void;
 
   // Query builder actions
   toggleField: (field: {
@@ -70,6 +72,7 @@ export const useExplorerStore = create<ExplorerState>((set) => ({
   scopeFilter: null,
   selectedTable: null,
   viewMode: "detail",
+  highlightedColumn: null,
 
   // Query builder
   queryBuilderFields: [],
@@ -87,8 +90,9 @@ export const useExplorerStore = create<ExplorerState>((set) => ({
   },
   setSearchQuery: (query) => set({ searchQuery: query }),
   setScopeFilter: (scope) => set({ scopeFilter: scope }),
-  setSelectedTable: (name) => set({ selectedTable: name, queryBuilderFields: [] }),
+  setSelectedTable: (name) => set({ selectedTable: name, queryBuilderFields: [], highlightedColumn: null }),
   setViewMode: (mode) => set({ viewMode: mode }),
+  setHighlightedColumn: (column) => set({ highlightedColumn: column }),
 
   // Query builder actions
   toggleField: (field) =>

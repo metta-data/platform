@@ -27,21 +27,32 @@ function ExplorerPageInner() {
     selectedSnapshotId,
     selectedTable,
     viewMode,
+    highlightedColumn,
     setSelectedTable,
     setAvailableSnapshots,
     setViewMode,
+    setHighlightedColumn,
   } = useExplorerStore();
   const [scopes, setScopes] = useState<
     { name: string; label: string; count: number }[]
   >([]);
 
-  // Deep-link: if ?table= query param is present, select that table and
-  // ensure detail view mode so the table detail panel is visible
+  // Deep-link: if ?table= query param is present, select that table.
+  // Optional ?viewMode=detail|map and ?column=ELEMENT params.
   useEffect(() => {
     const tableParam = searchParams.get("table");
+    const viewModeParam = searchParams.get("viewMode") as "detail" | "map" | null;
+    const columnParam = searchParams.get("column");
+
     if (tableParam && tableParam !== selectedTable) {
       setSelectedTable(tableParam);
-      setViewMode("detail");
+      setViewMode(viewModeParam === "map" ? "map" : "detail");
+    } else if (viewModeParam && viewModeParam !== viewMode) {
+      setViewMode(viewModeParam);
+    }
+
+    if (columnParam) {
+      setHighlightedColumn(columnParam);
     }
     // Only run on mount / when searchParams change
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -133,6 +144,7 @@ function ExplorerPageInner() {
                 <TableDetailView
                   tableName={selectedTable}
                   onNavigateTable={handleSelectTable}
+                  highlightedColumn={highlightedColumn}
                 />
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground">

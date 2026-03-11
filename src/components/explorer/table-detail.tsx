@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Search, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -37,18 +37,22 @@ function matchesColumnFilter(
 interface TableDetailProps {
   tableName: string;
   onNavigateTable: (tableName: string) => void;
+  highlightedColumn?: string | null;
 }
 
 export function TableDetailView({
   tableName,
   onNavigateTable,
+  highlightedColumn,
 }: TableDetailProps) {
   const selectedSnapshotId = useExplorerStore((s) => s.selectedSnapshotId);
+  const setHighlightedColumn = useExplorerStore((s) => s.setHighlightedColumn);
   const [tableDetail, setTableDetail] = useState<TableDetailType | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showInherited, setShowInherited] = useState(true);
   const [columnFilter, setColumnFilter] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Reset filter when table changes
   useEffect(() => {
@@ -76,6 +80,42 @@ export function TableDetailView({
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [selectedSnapshotId, tableName]);
+
+  // Scroll to and highlight the target column when deep-linked
+  const scrollToColumn = useCallback(
+    (element: string) => {
+      if (!containerRef.current) return;
+      const row = containerRef.current.querySelector(
+        `[data-column="${CSS.escape(element)}"]`
+      );
+      if (row) {
+        row.scrollIntoView({ behavior: "smooth", block: "center" });
+        // Auto-clear highlight after 3s
+        setTimeout(() => setHighlightedColumn(null), 3000);
+      }
+    },
+    [setHighlightedColumn]
+  );
+
+  useEffect(() => {
+    if (!highlightedColumn || !tableDetail) return;
+
+    // Check if column is in own columns
+    const isOwn = tableDetail.columns.some(
+      (c) => c.element === highlightedColumn && c.definedOnTable === tableName
+    );
+
+    if (isOwn) {
+      // Own column — scroll immediately
+      requestAnimationFrame(() => scrollToColumn(highlightedColumn));
+    } else {
+      // Inherited column — expand inherited section first, then scroll
+      setShowInherited(true);
+      // Wait for collapsible to expand
+      setTimeout(() => scrollToColumn(highlightedColumn), 150);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightedColumn, tableDetail]);
 
   if (loading) {
     return (
@@ -132,7 +172,7 @@ export function TableDetailView({
   }
 
   return (
-    <div className="p-6 overflow-auto">
+    <div ref={containerRef} className="p-6 overflow-auto">
       {/* Header */}
       <div className="mb-6">
         <h2 className="text-2xl font-bold font-mono">{tableDetail.name}</h2>
@@ -235,6 +275,7 @@ export function TableDetailView({
               <ColumnTable
                 columns={filtered}
                 onNavigateTable={onNavigateTable}
+                highlightedColumn={highlightedColumn}
               />
             ) : (
               <p className="text-sm text-muted-foreground">
@@ -291,9 +332,11 @@ export function TableDetailView({
 function ColumnTable({
   columns,
   onNavigateTable,
+  highlightedColumn,
 }: {
   columns: ColumnDetail[];
   onNavigateTable: (name: string) => void;
+  highlightedColumn?: string | null;
 }) {
   return (
     <Table>
@@ -309,7 +352,15 @@ function ColumnTable({
       </TableHeader>
       <TableBody>
         {columns.map((col) => (
-          <TableRow key={col.element}>
+          <TableRow
+            key={col.element}
+            data-column={col.element}
+            className={
+              highlightedColumn === col.element
+                ? "bg-primary/10 ring-2 ring-primary ring-inset transition-all duration-500"
+                : ""
+            }
+          >
             <TableCell className="font-mono text-sm">{col.element}</TableCell>
             <TableCell className="text-sm">{col.label}</TableCell>
             <TableCell>

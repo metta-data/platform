@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Catalog → Explorer deep-links** — each catalog entry now links to its table in the Schema Explorer
+  - Icon link on every catalog table row navigates to the explorer's detail view with the column highlighted
+  - Dropdown in catalog detail sheet header offers "Open in Detail View" (with column highlight) and "Open in Schema Map"
+  - Explorer URL now accepts `?viewMode=detail|map` and `?column=ELEMENT` params for deep-linking
+  - Target column auto-scrolls into view with a brief ring highlight that fades after 3 seconds; inherited columns are auto-expanded
+  - Reusable `ExplorerLink` component and `buildExplorerUrl` helper for use across the app
 - **Data Classification & Sensitivity Labels** — classify catalog entries by sensitivity level (Public, Internal, Confidential, PII, PHI, PCI) with color-coded badges, severity ordering, and justification tracking
   - Classification badges on catalog entry rows and detail view
   - Classification filter dropdown in catalog list
