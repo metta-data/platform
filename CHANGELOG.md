@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Diagnose references endpoint** — `GET /api/snapshots/[id]/diagnose-references` scans all `referenceTable` values in a snapshot and reports stale entries (labels stored instead of table names) with suggested corrections
 - **Catalog → Explorer deep-links** — each catalog entry now links to its table in the Schema Explorer
   - Icon link on every catalog table row navigates to the explorer's detail view with the column highlighted
   - Dropdown in catalog detail sheet header offers "Open in Detail View" (with column highlight) and "Open in Schema Map"
