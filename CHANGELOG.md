@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Reference Health UI** — admin snapshots page now has a "References" button per snapshot that opens a dialog showing diagnosis results (valid, stale, unresolvable counts with a detailed table of stale entries) and one-click repair via the ServiceNow API
 - **Diagnose references endpoint** — `GET /api/snapshots/[id]/diagnose-references` scans all `referenceTable` values in a snapshot and reports stale entries (labels stored instead of table names) with suggested corrections
 - **Catalog → Explorer deep-links** — each catalog entry now links to its table in the Schema Explorer
   - Icon link on every catalog table row navigates to the explorer's detail view with the column highlighted

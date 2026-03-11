@@ -31,6 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ReferenceHealthDialog } from "@/components/admin/reference-health-dialog";
 
 interface Snapshot {
   id: string;
@@ -164,6 +165,7 @@ export default function SnapshotsPage() {
     isBaseline: true,
   });
   const [saving, setSaving] = useState(false);
+  const [healthSnapshotId, setHealthSnapshotId] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchSnapshots = useCallback(() => {
@@ -423,19 +425,43 @@ export default function SnapshotsPage() {
                     {new Date(snap.createdAt).toLocaleDateString()}
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(snap.id)}
-                    >
-                      Delete
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      {snap.status === "COMPLETED" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setHealthSnapshotId(snap.id)}
+                        >
+                          References
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(snap.id)}
+                      >
+                        Delete
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </Card>
+      )}
+
+      {healthSnapshotId && (
+        <ReferenceHealthDialog
+          snapshotId={healthSnapshotId}
+          snapshotLabel={
+            snapshots.find((s) => s.id === healthSnapshotId)?.label ?? ""
+          }
+          open={!!healthSnapshotId}
+          onOpenChange={(open) => {
+            if (!open) setHealthSnapshotId(null);
+          }}
+        />
       )}
     </div>
   );
