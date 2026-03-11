@@ -62,12 +62,14 @@ function buildSnowflakeSql(
     // ── Reference field → LEFT JOIN referenced table ──
     // Reference columns in Snowflake store JSON {"value":"<sys_id>", ...};
     // use PARSE_JSON to extract the GUID for the join condition.
+    // Only emit the JOIN when there are columns to SELECT from it
+    // (display column or explicit dot-walk fields).
     if (isRef) {
       const refAlias = `ref_${field.element}`;
       const refView = `${field.referenceTable!.toUpperCase()}__VIEW`;
-      joins.push(
-        `LEFT JOIN ${prefix}${refView} ${refAlias}\n  ON PARSE_JSON(${q}${col}):value::STRING = ${refAlias}.SYS_ID`
-      );
+
+      // Determine which columns we'd select from the joined table
+      const refSelectCols: string[] = [];
 
       // Auto-include the display value column from the referenced table
       const displayCol = displayColumnMap[field.referenceTable!];
@@ -75,17 +77,25 @@ function buildSnowflakeSql(
         (dw) => dw.element.toLowerCase() === displayCol.toLowerCase()
       );
       if (displayCol && !alreadyDotWalked) {
-        selectCols.push(
+        refSelectCols.push(
           `${refAlias}.${displayCol.toUpperCase()} AS ${col}__DISPLAY`
         );
       }
 
       if (field.dotWalkFields.length > 0) {
         for (const dw of field.dotWalkFields) {
-          selectCols.push(
+          refSelectCols.push(
             `${refAlias}.${dw.element.toUpperCase()} AS ${col}__${dw.element.toUpperCase()}`
           );
         }
+      }
+
+      // Only add the JOIN if we have columns to select from it
+      if (refSelectCols.length > 0) {
+        joins.push(
+          `LEFT JOIN ${prefix}${refView} ${refAlias}\n  ON PARSE_JSON(${q}${col}):value::STRING = ${refAlias}.SYS_ID`
+        );
+        selectCols.push(...refSelectCols);
       }
     } else if (isRefType) {
       // Reference type but target table unknown — hint only
