@@ -22,6 +22,8 @@ Mettadata Platform is a Next.js application for exploring, comparing, and catalo
 npm run dev          # Start dev server
 npm run build        # prisma generate && next build
 npm run lint         # ESLint
+npm test             # Run tests (vitest)
+npm run test:watch   # Run tests in watch mode
 npx prisma migrate dev --name <name>   # Create migration
 npx prisma generate  # Regenerate Prisma client
 ```
@@ -99,6 +101,22 @@ gh issue list --state open
 - Use `@map("snake_case")` for column names
 - Always run `npx prisma generate` after schema changes
 - Batch large operations to avoid Prisma parameter limits
+
+## Development Workflow
+
+- **Feature branches** — Work on `feat/` or `fix/` branches, merge to `main` via PR
+- **CI checks** — GitHub Actions runs lint, test, and build on every PR to `main`
+- **Local verification** — Before pushing, run `npm run lint && npm test && npm run build`
+- **Railway deploys from `main`** — Only merged PRs reach production
+- **Rollback** — Use `git revert` for code issues; Railway dashboard for instant rollback to previous deploy
+
+## Testing
+
+- **Framework**: Vitest with mocked Prisma and auth
+- **Test location**: `src/__tests__/` (mirrors src structure)
+- **Mock setup**: `src/__tests__/setup.ts` provides `mockPrisma`, `mockUnauthorized()`, `mockAdminSession()`, `mockStewardSession()`, `mockViewerSession()`
+- **Regression-first rule**: When a bug is found in production, write a test that reproduces it before fixing
+- **Reference resolution**: Shared logic in `src/lib/servicenow/resolve-references.ts` — used by ingestion, diagnose-references, and repair-references endpoints
 
 ## Code Patterns
 

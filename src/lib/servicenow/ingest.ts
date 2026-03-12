@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { ServiceNowClient } from "./client";
+import { buildReferenceLookups, resolveReferenceTable } from "./resolve-references";
 import type { ServiceNowCredentials, IngestProgress } from "./types";
 
 const DB_BATCH_SIZE = 1000;
@@ -119,37 +120,23 @@ export async function ingestFromInstance(
       .map((r) => ServiceNowClient.parseColumnRecord(r))
       .filter((c) => tableNameSet.has(c.definedOnTable));
 
-    // Resolve referenceTable for reference-type columns.
-    // The reference field value may be a table name, a sys_id, or something else
-    // depending on the ServiceNow instance configuration. Resolution chain:
-    //   1. Direct table name match (reference.value IS a table name)
-    //   2. sys_id lookup (reference.value is a sys_db_object sys_id)
-    //   3. Label lookup (reference.display_value is the table label)
-    //   4. Case-insensitive label match (handles ServiceNow returning
-    //      wrong-case values like "user" where the label is "User")
-    const labelToName = new Map(parsedTables.map((t) => [t.label, t.name]));
-    const lowerLabelToName = new Map<string, string>();
-    for (const t of parsedTables) {
-      const lower = t.label.toLowerCase();
-      if (!lowerLabelToName.has(lower)) {
-        lowerLabelToName.set(lower, t.name);
-      }
-    }
+    // Resolve referenceTable for reference-type columns using the shared
+    // 4-step resolution chain (see resolve-references.ts for details).
+    const lookups = buildReferenceLookups(parsedTables);
     let refTotal = 0, resolvedByName = 0, resolvedBySysId = 0, resolvedByLabel = 0, resolvedByLabelCI = 0, unresolved = 0;
     for (const col of parsedColumns) {
       if (col.referenceTableSysId) {
         refTotal++;
-        const byName = tableNameSet.has(col.referenceTableSysId) ? col.referenceTableSysId : null;
-        const bySysId = !byName ? sysIdToName.get(col.referenceTableSysId) : null;
-        const byLabel = !byName && !bySysId ? (labelToName.get(col.referenceTableLabel ?? "") ?? null) : null;
-        const byLabelCI = !byName && !bySysId && !byLabel
-          ? (lowerLabelToName.get((col.referenceTableLabel ?? "").toLowerCase()) ?? null)
-          : null;
-        col.referenceTable = byName ?? bySysId ?? byLabel ?? byLabelCI ?? null;
-        if (byName) resolvedByName++;
-        else if (bySysId) resolvedBySysId++;
-        else if (byLabel) resolvedByLabel++;
-        else if (byLabelCI) resolvedByLabelCI++;
+        const result = resolveReferenceTable(
+          col.referenceTableSysId,
+          col.referenceTableLabel,
+          lookups
+        );
+        col.referenceTable = result.resolvedName;
+        if (result.resolvedBy === "name") resolvedByName++;
+        else if (result.resolvedBy === "sysId") resolvedBySysId++;
+        else if (result.resolvedBy === "label") resolvedByLabel++;
+        else if (result.resolvedBy === "labelCI") resolvedByLabelCI++;
         else unresolved++;
       }
     }

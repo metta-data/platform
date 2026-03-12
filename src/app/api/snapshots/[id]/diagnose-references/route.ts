@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { buildReferenceLookups, validateReferenceTable } from "@/lib/servicenow/resolve-references";
 
 /**
  * GET /api/snapshots/[id]/diagnose-references
@@ -33,18 +34,7 @@ export async function GET(
     select: { name: true, label: true, sysId: true },
   });
 
-  const tableNameSet = new Set(allTables.map((t) => t.name));
-  const labelToName = new Map<string, string>();
-  const lowerLabelToName = new Map<string, string>();
-  for (const t of allTables) {
-    if (!labelToName.has(t.label)) {
-      labelToName.set(t.label, t.name);
-    }
-    const lower = t.label.toLowerCase();
-    if (!lowerLabelToName.has(lower)) {
-      lowerLabelToName.set(lower, t.name);
-    }
-  }
+  const lookups = buildReferenceLookups(allTables);
 
   // Query all columns with a referenceTable value
   const refColumns = await prisma.snapshotColumn.findMany({
@@ -78,25 +68,17 @@ export async function GET(
 
   for (const col of refColumns) {
     const ref = col.referenceTable!;
-    if (tableNameSet.has(ref)) {
+    const result = validateReferenceTable(ref, lookups);
+
+    if (result.valid) {
       validCount++;
-      continue;
-    }
-
-    // Stale — try to suggest the correct value
-    const byLabel = labelToName.get(ref) ?? null;
-    const byLabelCI = !byLabel
-      ? (lowerLabelToName.get(ref.toLowerCase()) ?? null)
-      : null;
-    const suggested = byLabel ?? byLabelCI ?? null;
-
-    if (suggested) {
+    } else if (result.suggestedName) {
       stale.push({
         tableName: col.table.name,
         element: col.element,
         currentValue: ref,
-        suggestedValue: suggested,
-        resolvedBy: byLabel ? "label" : "labelCI",
+        suggestedValue: result.suggestedName,
+        resolvedBy: result.resolvedBy!,
       });
     } else {
       unresolvable.push({

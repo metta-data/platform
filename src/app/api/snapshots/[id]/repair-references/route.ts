@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { ServiceNowClient } from "@/lib/servicenow/client";
 import { requireAdmin } from "@/lib/auth";
 import { decrypt } from "@/lib/crypto";
+import { buildReferenceLookups, resolveReferenceTable } from "@/lib/servicenow/resolve-references";
 
 /**
  * POST /api/snapshots/[id]/repair-references
@@ -47,19 +48,7 @@ export async function POST(
     select: { name: true, label: true, sysId: true },
   });
 
-  const tableNameSet = new Set(allTables.map((t) => t.name));
-  const sysIdToName = new Map(allTables.map((t) => [t.sysId, t.name]));
-  const labelToName = new Map<string, string>();
-  const lowerLabelToName = new Map<string, string>();
-  for (const t of allTables) {
-    if (!labelToName.has(t.label)) {
-      labelToName.set(t.label, t.name);
-    }
-    const lower = t.label.toLowerCase();
-    if (!lowerLabelToName.has(lower)) {
-      lowerLabelToName.set(lower, t.name);
-    }
-  }
+  const lookups = buildReferenceLookups(allTables);
 
   // Fetch reference field data from ServiceNow (lightweight — only reference columns)
   const client = new ServiceNowClient({
@@ -70,11 +59,7 @@ export async function POST(
 
   const refFields = await client.fetchReferenceFields();
 
-  // Resolve each reference to a table name using the same 4-step chain as ingestion:
-  //   1. Direct table name match (reference.value IS a table name)
-  //   2. sys_id lookup (reference.value is a sys_db_object sys_id)
-  //   3. Label lookup (reference.display_value is the table label)
-  //   4. Case-insensitive label lookup (handles wrong-case values like "user" → "User")
+  // Resolve each reference to a table name using the shared 4-step chain
   const refMap = new Map<string, string>();
   let resolvedByName = 0;
   let resolvedBySysId = 0;
@@ -84,19 +69,13 @@ export async function POST(
   const unresolvedSamples: { tableName: string; element: string; refSysId: string; refLabel: string }[] = [];
 
   for (const ref of refFields) {
-    const byName = tableNameSet.has(ref.refSysId) ? ref.refSysId : null;
-    const bySysId = !byName ? sysIdToName.get(ref.refSysId) : null;
-    const byLabel = !byName && !bySysId ? (labelToName.get(ref.refLabel) ?? null) : null;
-    const byLabelCI = !byName && !bySysId && !byLabel
-      ? (lowerLabelToName.get(ref.refLabel.toLowerCase()) ?? null)
-      : null;
-    const resolved = byName ?? bySysId ?? byLabel ?? byLabelCI ?? null;
+    const result = resolveReferenceTable(ref.refSysId, ref.refLabel, lookups);
 
-    if (resolved) {
-      refMap.set(`${ref.tableName}:${ref.element}`, resolved);
-      if (byName) resolvedByName++;
-      else if (bySysId) resolvedBySysId++;
-      else if (byLabel) resolvedByLabel++;
+    if (result.resolvedName) {
+      refMap.set(`${ref.tableName}:${ref.element}`, result.resolvedName);
+      if (result.resolvedBy === "name") resolvedByName++;
+      else if (result.resolvedBy === "sysId") resolvedBySysId++;
+      else if (result.resolvedBy === "label") resolvedByLabel++;
       else resolvedByLabelCI++;
     } else {
       unresolvedCount++;
@@ -107,9 +86,9 @@ export async function POST(
   }
 
   console.log(`[repair-references] Fetched ${refFields.length} reference fields from ServiceNow`);
-  console.log(`[repair-references]   tableNameSet size: ${tableNameSet.size}`);
-  console.log(`[repair-references]   sysIdToName map size: ${sysIdToName.size}`);
-  console.log(`[repair-references]   labelToName map size: ${labelToName.size}`);
+  console.log(`[repair-references]   tableNameSet size: ${lookups.tableNameSet.size}`);
+  console.log(`[repair-references]   sysIdToName map size: ${lookups.sysIdToName.size}`);
+  console.log(`[repair-references]   labelToName map size: ${lookups.labelToName.size}`);
   console.log(`[repair-references]   Resolved by name: ${resolvedByName}`);
   console.log(`[repair-references]   Resolved by sys_id: ${resolvedBySysId}`);
   console.log(`[repair-references]   Resolved by label: ${resolvedByLabel}`);
