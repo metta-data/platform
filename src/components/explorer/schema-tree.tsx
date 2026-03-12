@@ -23,6 +23,7 @@ export function SchemaTree({ onSelectTable }: SchemaTreeProps) {
   useEffect(() => {
     if (!selectedSnapshotId) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data-fetching effect needs loading state
     setLoading(true);
     setError(null);
 

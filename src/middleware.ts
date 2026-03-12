@@ -2,7 +2,8 @@ import { auth, authEnabled } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 // When auth is not configured, allow all requests through
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+/* eslint-disable @typescript-eslint/no-explicit-any --
+   Auth.js v5 beta types are incomplete; auth() callback typing requires `any` */
 const middleware = authEnabled
   ? (auth as any)((req: any) => {
       const { pathname } = req.nextUrl;

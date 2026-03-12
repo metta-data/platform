@@ -29,6 +29,7 @@ function CsdmPageInner() {
       domainParam &&
       CSDM_DOMAINS.domains.some((d) => d.id === domainParam)
     ) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing URL param to state on mount
       setActiveDomainId(domainParam);
     }
   }, [searchParams]);
