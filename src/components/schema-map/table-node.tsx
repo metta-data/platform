@@ -209,6 +209,7 @@ function TableNodeComponent({ id, data }: NodeProps) {
   useEffect(() => {
     if (!d.expanded || columnGroups.length > 0) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data-fetching effect needs loading state
     setLoadingColumns(true);
     fetch(
       `/api/tables/${encodeURIComponent(d.name)}?snapshotId=${d.snapshotId}`

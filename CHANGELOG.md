@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Automated test suite** — Vitest with mocked Prisma and auth; 42 tests covering reference resolution logic, catalog API, instance connection, and snapshot endpoints
+- **CI pipeline** — GitHub Actions workflow runs lint, test, and build on every PR to `main`
+- **Shared reference resolution module** — extracted 4-step resolution chain (`resolveReferenceTable()`) into `src/lib/servicenow/resolve-references.ts`, reused by ingestion, diagnose-references, and repair-references endpoints
+
+### Changed
+
+- **Development workflow** — adopted feature-branch workflow with CI gate; documented in CLAUDE.md
 - **Reference Health UI** — admin snapshots page now has a "References" button per snapshot that opens a dialog showing diagnosis results (valid, stale, unresolvable counts with a detailed table of stale entries) and one-click repair via the ServiceNow API
 - **Diagnose references endpoint** — `GET /api/snapshots/[id]/diagnose-references` scans all `referenceTable` values in a snapshot and reports stale entries (labels stored instead of table names) with suggested corrections
 - **Catalog → Explorer deep-links** — each catalog entry now links to its table in the Schema Explorer
