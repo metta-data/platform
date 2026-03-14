@@ -10,7 +10,8 @@ import { SearchBar } from "@/components/explorer/search-bar";
 import { SchemaMap } from "@/components/schema-map/schema-map";
 import { QueryBuilderPanel } from "@/components/schema-map/query-builder-panel";
 import { useExplorerStore } from "@/stores/explorer-store";
-import { Table2, Map } from "lucide-react";
+import { ReferenceGraph } from "@/components/reference-graph/reference-graph";
+import { Table2, Map, Share2 } from "lucide-react";
 import type { SnapshotSummary } from "@/types";
 
 export default function ExplorerPage() {
@@ -41,12 +42,14 @@ function ExplorerPageInner() {
   // Optional ?viewMode=detail|map and ?column=ELEMENT params.
   useEffect(() => {
     const tableParam = searchParams.get("table");
-    const viewModeParam = searchParams.get("viewMode") as "detail" | "map" | null;
+    const viewModeParam = searchParams.get("viewMode") as "detail" | "map" | "graph" | null;
     const columnParam = searchParams.get("column");
 
     if (tableParam && tableParam !== selectedTable) {
       setSelectedTable(tableParam);
-      setViewMode(viewModeParam === "map" ? "map" : "detail");
+      if (viewModeParam === "map") setViewMode("map");
+      else if (viewModeParam === "graph") setViewMode("graph");
+      else setViewMode("detail");
     } else if (viewModeParam && viewModeParam !== viewMode) {
       setViewMode(viewModeParam);
     }
@@ -115,28 +118,41 @@ function ExplorerPageInner() {
               <Map className="w-3.5 h-3.5" />
               Schema Map
             </button>
+            <button
+              onClick={() => setViewMode("graph")}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                viewMode === "graph"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              Graph
+            </button>
           </div>
         </div>
       </div>
 
       {/* Main content: tree + detail/map */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Tree panel + Query Builder */}
-        <div className="w-[380px] border-r overflow-hidden flex-shrink-0 flex flex-col">
-          <div className="flex-1 overflow-hidden min-h-[200px]">
-            <SchemaTree onSelectTable={handleSelectTable} />
+        {/* Tree panel + Query Builder (hidden in graph view) */}
+        {viewMode !== "graph" && (
+          <div className="w-[380px] border-r overflow-hidden flex-shrink-0 flex flex-col">
+            <div className="flex-1 overflow-hidden min-h-[200px]">
+              <SchemaTree onSelectTable={handleSelectTable} />
+            </div>
+            {viewMode === "map" && selectedTable && (
+              <>
+                <div className="border-t" />
+                <div className="h-[340px] flex-shrink-0 overflow-auto">
+                  <QueryBuilderPanel />
+                </div>
+              </>
+            )}
           </div>
-          {viewMode === "map" && selectedTable && (
-            <>
-              <div className="border-t" />
-              <div className="h-[340px] flex-shrink-0 overflow-auto">
-                <QueryBuilderPanel />
-              </div>
-            </>
-          )}
-        </div>
+        )}
 
-        {/* Right panel — switches between Detail and Schema Map */}
+        {/* Right panel — switches between Detail, Schema Map, and Graph */}
         <div className="flex-1 overflow-hidden">
           {viewMode === "detail" ? (
             <div className="h-full overflow-auto">
@@ -153,8 +169,10 @@ function ExplorerPageInner() {
                 </div>
               )}
             </div>
-          ) : (
+          ) : viewMode === "map" ? (
             <SchemaMap />
+          ) : (
+            <ReferenceGraph snapshotId={selectedSnapshotId} focusTable={selectedTable} />
           )}
         </div>
       </div>

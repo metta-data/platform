@@ -20,7 +20,7 @@ import {
  */
 export function buildExplorerUrl(
   tableName: string,
-  viewMode?: "detail" | "map",
+  viewMode?: "detail" | "map" | "graph",
   column?: string
 ): string {
   const params = new URLSearchParams();

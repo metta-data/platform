@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -22,6 +23,13 @@ export default function Home() {
       <main className="flex flex-1 flex-col items-center justify-center px-6 pb-24">
         <div className="flex flex-col items-center gap-10 text-center">
           <div>
+            <Image
+              src="/logo.png"
+              alt=""
+              width={80}
+              height={80}
+              className="mx-auto mb-4"
+            />
             <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
               Mettadata Platform
             </h1>

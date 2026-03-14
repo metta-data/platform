@@ -7,7 +7,7 @@ interface ExplorerState {
   searchQuery: string;
   scopeFilter: string | null;
   selectedTable: string | null;
-  viewMode: "detail" | "map";
+  viewMode: "detail" | "map" | "graph";
   highlightedColumn: string | null;
 
   // Query builder state
@@ -23,7 +23,7 @@ interface ExplorerState {
   setSearchQuery: (query: string) => void;
   setScopeFilter: (scope: string | null) => void;
   setSelectedTable: (name: string | null) => void;
-  setViewMode: (mode: "detail" | "map") => void;
+  setViewMode: (mode: "detail" | "map" | "graph") => void;
   setHighlightedColumn: (column: string | null) => void;
 
   // Query builder actions

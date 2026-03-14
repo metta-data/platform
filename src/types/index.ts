@@ -1,4 +1,11 @@
 export type { GraphNode, GraphEdge, GraphResponse } from "./graph";
+export type {
+  GraphViewMode,
+  GraphEdgeType,
+  ReferenceGraphNode,
+  ReferenceGraphEdge,
+  ReferenceGraphResponse,
+} from "./reference-graph";
 
 export interface TreeTableNode {
   name: string;
